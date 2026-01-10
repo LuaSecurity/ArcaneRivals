@@ -357,20 +357,17 @@ function UI:SetupMovement()
     local MoveTab = self:CreateTab("Movement")
 
     local SpeedGroup = MoveTab:AddLeftGroupbox("Speed")
-    SpeedGroup:AddToggle("Speed_Enabled", { Text = "Enabled" })
+    SpeedGroup:AddToggle("Speed_Enabled", { Text = "Enabled" }):AddKeyPicker("SpeedKey", { Default = "None", Text = "Speed", Mode = "Toggle" })
     SpeedGroup:AddDropdown("Speed_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
     SpeedGroup:AddSlider("Speed_Value", { Text = "Speed", Default = 16, Min = 16, Max = 200, Rounding = 1 })
 
     local FlyGroup = MoveTab:AddLeftGroupbox("Fly")
-    FlyGroup:AddToggle("Fly_Enabled", { Text = "Enabled" })
+    FlyGroup:AddToggle("Fly_Enabled", { Text = "Enabled" }):AddKeyPicker("FlyKey", { Default = "None", Text = "Fly", Mode = "Toggle" })
     FlyGroup:AddDropdown("Fly_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
     FlyGroup:AddSlider("Fly_Speed", { Text = "Speed", Default = 50, Min = 10, Max = 200, Rounding = 1 })
 
-    local BhopGroup = MoveTab:AddRightGroupbox("Bhop")
-    BhopGroup:AddToggle("Bhop_Enabled", { Text = "Enabled" })
-
     local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
-    HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" })
+    HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" }):AddKeyPicker("HoverKey", { Default = "None", Text = "Hover", Mode = "Toggle" })
     HoverGroup:AddToggle("Hover_Visuals", { Text = "Show Visuals (3D Ring)" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
     HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = -50, Max = 50, Rounding = 1 })
     HoverGroup:AddSlider("Hover_Radius", { Text = "Radius (Distance)", Default = 20, Min = 5, Max = 50, Rounding = 1 })
@@ -448,12 +445,6 @@ function UI:SetupMovement()
             end
         end
 
-        if Toggles.Bhop_Enabled.Value then
-            if hum.FloorMaterial ~= Enum.Material.Air then
-                hum.Jump = true
-            end
-        end
-
         if Toggles.Hover_Enabled.Value then
             local target = nil
             local minDist = math.huge
@@ -501,8 +492,6 @@ function UI:SetupMovement()
                         local a1 = (i / segments) * (math.pi * 2)
                         local a2 = ((i + 1) / segments) * (math.pi * 2)
                         
-                        -- Draw circle at target base (or height? usually base is better for reference)
-                        -- Let's draw it at the hover height to visualize path
                         local h = height
                         local p1 = center + Vector3.new(math.cos(a1)*radius, h, math.sin(a1)*radius)
                         local p2 = center + Vector3.new(math.cos(a2)*radius, h, math.sin(a2)*radius)
