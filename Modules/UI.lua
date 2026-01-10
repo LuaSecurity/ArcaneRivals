@@ -131,8 +131,8 @@ function UI:SetupVisuals()
                 BoxOutline = DrawingHandler:Square({ Thickness = 3, Color = Color3.new(0,0,0), Visible = false }),
                 Name = DrawingHandler:Text({ Size = 14, Center = true, Outline = true, Visible = false }),
                 Distance = DrawingHandler:Text({ Size = 13, Center = true, Outline = true, Visible = false }),
-                HealthBar = DrawingHandler:Line({ Thickness = 4, Visible = false }),
                 HealthBg = DrawingHandler:Line({ Thickness = 4, Color = Color3.new(0,0,0), Visible = false }),
+                HealthBar = DrawingHandler:Line({ Thickness = 4, Visible = false }),
                 Tracer = DrawingHandler:Line({ Thickness = 1, Visible = false }),
                 OOF = DrawingHandler:Triangle({ Thickness = 1, Filled = true, Visible = false })
             },
@@ -541,4 +541,5 @@ function UI:Notify(text, time)
 end
 
 return UI
+
 
