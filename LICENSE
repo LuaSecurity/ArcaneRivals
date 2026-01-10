@@ -1,24 +1,41 @@
-This is free and unencumbered software released into the public domain.
+END USER LICENSE AGREEMENT (EULA)
 
-Anyone is free to copy, modify, publish, use, compile, sell, or
-distribute this software, either in source code form or as a compiled
-binary, for any purpose, commercial or non-commercial, and by any
-means.
+Version 1.0
+Last Updated: January 9, 2026
 
-In jurisdictions that recognize copyright laws, the author or authors
-of this software dedicate any and all copyright interest in the
-software to the public domain. We make this dedication for the benefit
-of the public at large and to the detriment of our heirs and
-successors. We intend this dedication to be an overt act of
-relinquishment in perpetuity of all present and future rights to this
-software under copyright law.
+1. OWNERSHIP AND COPYRIGHT
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
+The software, including but not limited to its source code, executable code, interface design, documentation, and any associated assets (collectively referred to as the "Software"), is the sole and exclusive property of 192.0.0.2 ("the Owner"). The Software is protected by copyright, trademark, and other intellectual property laws. All rights not expressly granted to you in this License are reserved by the Owner.
 
-For more information, please refer to <https://unlicense.org>
+2. GRANT OF LICENSE
+
+Subject to your compliance with the terms of this Agreement, the Owner grants you a personal, non-exclusive, non-transferable, and limited license to install and execute the Software solely for your personal, non-commercial use.
+
+3. RESTRICTIONS ON USE
+
+You are expressly prohibited from, and you shall not allow any third party to:
+
+* Unauthorized Use: Use the Software for any purpose other than those expressly permitted in Section 2.
+* Modification: Decompile, reverse engineer, disassemble, attempt to derive the source code of, decrypt, or create derivative works based on the Software or any part thereof.
+* Forks and Distribution: Create "forks," clones, or variations of the Software. You may not distribute, sublicense, rent, lease, lend, sell, or otherwise transfer the Software to any third party.
+* Removal of Notices: Remove, alter, or obscure any copyright, trademark, or proprietary notices contained within or on the Software.
+
+4. TERMINATION
+
+This License is effective until terminated. Your rights under this License will terminate automatically without notice from the Owner if you fail to comply with any term(s) of this Agreement. Upon termination, you must cease all use of the Software and destroy all copies, full or partial, of the Software.
+
+5. NO WARRANTY (AS-IS)
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+6. LIMITATION OF LIABILITY
+
+TO THE EXTENT NOT PROHIBITED BY LAW, IN NO EVENT SHALL THE OWNER BE LIABLE FOR PERSONAL INJURY, OR ANY INCIDENTAL, SPECIAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER, INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF PROFITS, LOSS OF DATA, BUSINESS INTERRUPTION, OR ANY OTHER COMMERCIAL DAMAGES OR LOSSES, ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. GOVERNING LAW
+
+This License shall be governed by and construed in accordance with the laws of your local jurisdiction, excluding its conflict of law principles. Any legal action or proceeding arising under this License will be brought exclusively in the courts where the Owner resides.
+
+8. ENTIRE AGREEMENT
+
+This Agreement constitutes the entire agreement between you and the Owner regarding the Software and supersedes all prior or contemporaneous understandings regarding such subject matter.
