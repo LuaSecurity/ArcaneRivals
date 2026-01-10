@@ -320,28 +320,29 @@ function UI:SetupVisuals()
                 for _, line in pairs(skeletonLines) do line.Visible = false end
             end
 
-            if Toggles.Chams_Enabled.Value then
+            -- Safe Check for Chams
+            if Toggles.Chams_Enabled and Toggles.Chams_Enabled.Value then
                 if highlight.Parent ~= CoreGui then
                     highlight.Parent = CoreGui
                 end
                 highlight.Adornee = char
                 highlight.Enabled = true
                 
-                if Toggles.Chams_Fill.Value then
+                if Toggles.Chams_Fill and Toggles.Chams_Fill.Value and Options.ChamsFillColor then
                     highlight.FillColor = Options.ChamsFillColor.Value
                     highlight.FillTransparency = Options.ChamsFillColor.Transparency
                 else
                     highlight.FillTransparency = 1
                 end
                 
-                if Toggles.Chams_Outline.Value then
+                if Toggles.Chams_Outline and Toggles.Chams_Outline.Value and Options.ChamsOutlineColor then
                     highlight.OutlineColor = Options.ChamsOutlineColor.Value
                     highlight.OutlineTransparency = Options.ChamsOutlineColor.Transparency
                 else
                     highlight.OutlineTransparency = 1
                 end
                 
-                if Toggles.Chams_Occluded.Value then
+                if Toggles.Chams_Occluded and Toggles.Chams_Occluded.Value then
                     highlight.DepthMode = Enum.HighlightDepthMode.Occluded
                 else
                     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
