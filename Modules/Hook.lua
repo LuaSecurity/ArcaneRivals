@@ -2,10 +2,12 @@ local Hook = {}
 Hook.__index = Hook
 
 local getgenv = getgenv or function() return _G end
-local h_func = getgenv().hookfunction or hookfunction
-local h_meta = getgenv().hookmetamethod or hookmetamethod
-local c_call = getgenv().checkcaller or checkcaller
-local unpack = table.unpack or unpack
+local env = getgenv()
+local hookfunction = env.hookfunction or hookfunction
+local hookmetamethod = env.hookmetamethod or hookmetamethod
+local checkcaller = env.checkcaller or checkcaller
+local getnamecallmethod = env.getnamecallmethod or function() return "" end
+local newcclosure = env.newcclosure or function(f) return f end
 
 function Hook.new()
     local self = setmetatable({}, Hook)
@@ -21,38 +23,40 @@ function Hook:Log(msg)
 end
 
 local function SafeExecute(replacement, original, ...)
-    local results = { pcall(replacement, original, ...) }
+    local args = {...}
+    local success, result = pcall(function()
+        return {replacement(original, unpack(args))}
+    end)
     
-    if not results[1] then
-        return false, results[2]
+    if not success then
+        return false, result
     end
     
-    table.remove(results, 1)
-    return true, results
+    return true, result
 end
 
 function Hook:HookFunction(target, replacement)
-    assert(type(target) == "function", "HookFunction: Invalid target (expected function)")
-    assert(type(replacement) == "function", "HookFunction: Invalid replacement (expected function)")
+    assert(type(target) == "function", "HookFunction: Invalid target")
+    assert(type(replacement) == "function", "HookFunction: Invalid replacement")
 
     local original
     
     local function detour(...)
-        if c_call() then 
+        if checkcaller() then 
             return original(...) 
         end
         
-        local success, result_table = SafeExecute(replacement, original, ...)
+        local success, results = SafeExecute(replacement, original, ...)
         
         if not success then
-            self:Log("Error in HookFunction: " .. tostring(result_table))
+            self:Log("Error in HookFunction: " .. tostring(results))
             return original(...)
         end
         
-        return unpack(result_table)
+        return unpack(results)
     end
 
-    original = h_func(target, detour)
+    original = hookfunction(target, newcclosure(detour))
     self.Registry[target] = original
     return original
 end
@@ -64,21 +68,25 @@ function Hook:HookMethod(object, method, replacement)
     local original
     
     local function detour(self_obj, ...)
-        if c_call() then 
+        if checkcaller() then 
             return original(self_obj, ...) 
         end
         
-        local success, result_table = SafeExecute(replacement, original, self_obj, ...)
-        
-        if not success then
-            self:Log("Error in HookMethod ("..method.."): " .. tostring(result_table))
-            return original(self_obj, ...)
+        if getnamecallmethod() == method then
+            local success, results = SafeExecute(replacement, original, self_obj, ...)
+            
+            if not success then
+                self:Log("Error in HookMethod ("..method.."): " .. tostring(results))
+                return original(self_obj, ...)
+            end
+            
+            return unpack(results)
         end
         
-        return unpack(result_table)
+        return original(self_obj, ...)
     end
     
-    original = h_meta(object, method, detour)
+    original = hookmetamethod(object, "__namecall", newcclosure(detour))
     self.Registry[method] = original
     return original
 end
@@ -88,10 +96,10 @@ function Hook:Restore(id)
     
     if original then
         if type(id) == "function" then
-            h_func(id, original)
+            hookfunction(id, original)
             self:Log("Restored function hook")
         else
-            self:Log("Restoring non-function hooks is context-dependent.")
+            self:Log("Restoring non-function hooks is context-dependent (Metamethods require overwrite).")
         end
         
         self.Registry[id] = nil
