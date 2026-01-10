@@ -71,7 +71,7 @@ function UI:SetupVisuals()
     ChamsGroup:AddToggle("Chams_Enabled", { Text = "Enabled" })
     ChamsGroup:AddToggle("Chams_Fill", { Text = "Fill" }):AddColorPicker("ChamsFillColor", { Default = Color3.fromRGB(150, 0, 0), Transparency = 0.5 })
     ChamsGroup:AddToggle("Chams_Outline", { Text = "Outline" }):AddColorPicker("ChamsOutlineColor", { Default = Color3.fromRGB(255, 0, 0), Transparency = 0 })
-    ChamsGroup:AddToggle("Chams_Occluded", { Text = "Occluded (Wallcheck)", Default = true })
+    ChamsGroup:AddToggle("Chams_Occluded", { Text = "Visible Check", Default = true })
 
     local TracerGroup = VisualsTab:AddRightGroupbox("Bullet Effects")
     TracerGroup:AddToggle("CustomTracers", { Text = "Bullet Tracers" })
@@ -80,7 +80,7 @@ function UI:SetupVisuals()
     TracerGroup:AddSlider("Tracer_Duration", { Text = "Lifetime (s)", Default = 1.5, Min = 0.1, Max = 5, Rounding = 1 })
 
     local MiscVisuals = VisualsTab:AddRightGroupbox("Visuals Extras")
-    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers (Lines)" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
+    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
     MiscVisuals:AddDropdown("Tracer_Origin", { Text = "Line Origin", Default = "Bottom", Values = {"Top", "Center", "Bottom"} })
     MiscVisuals:AddDivider()
     MiscVisuals:AddToggle("Esp_OOF", { Text = "Off-Screen Indicators" }):AddColorPicker("OOFColor", { Default = Color3.new(1,1,1) })
@@ -131,8 +131,8 @@ function UI:SetupVisuals()
                 BoxOutline = DrawingHandler:Square({ Thickness = 3, Color = Color3.new(0,0,0), Visible = false }),
                 Name = DrawingHandler:Text({ Size = 14, Center = true, Outline = true, Visible = false }),
                 Distance = DrawingHandler:Text({ Size = 13, Center = true, Outline = true, Visible = false }),
-                HealthBar = DrawingHandler:Line({ Thickness = 2, Visible = false }),
-                HealthBg = DrawingHandler:Line({ Thickness = 2, Color = Color3.new(0,0,0), Visible = false }),
+                HealthBar = DrawingHandler:Line({ Thickness = 4, Visible = false }),
+                HealthBg = DrawingHandler:Line({ Thickness = 4, Color = Color3.new(0,0,0), Visible = false }),
                 Tracer = DrawingHandler:Line({ Thickness = 1, Visible = false }),
                 OOF = DrawingHandler:Triangle({ Thickness = 1, Filled = true, Visible = false })
             },
@@ -369,7 +369,7 @@ function UI:SetupMovement()
 
     local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
     HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" }):AddKeyPicker("HoverKey", { Default = "None", Text = "Hover", Mode = "Toggle" })
-    HoverGroup:AddToggle("Hover_Visuals", { Text = "Show Visuals (3D Ring)" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
+    HoverGroup:AddToggle("Hover_Visuals", { Text = "Ring" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
     HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = -50, Max = 50, Rounding = 1 })
     HoverGroup:AddSlider("Hover_Radius", { Text = "Radius (Distance)", Default = 20, Min = 5, Max = 50, Rounding = 1 })
     HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 30, Min = 1, Max = 120, Rounding = 0, Suffix = " RPM" })
@@ -541,3 +541,4 @@ function UI:Notify(text, time)
 end
 
 return UI
+
