@@ -50,12 +50,6 @@ local function IsSameTeam(player)
     return myTeam ~= nil and theirTeam ~= nil and myTeam == theirTeam
 end
 
-local function RotateVector2(v2, angle)
-    local c = math.cos(angle)
-    local s = math.sin(angle)
-    return Vector2.new(c * v2.X - s * v2.Y, s * v2.X + c * v2.Y)
-end
-
 function UI:SetupVisuals()
     local VisualsTab = self:CreateTab("Visuals")
     
@@ -194,22 +188,19 @@ function UI:SetupVisuals()
 
             if Toggles.Esp_OOF.Value and not onScreen then
                 local relativePos = Camera.CFrame:PointToObjectSpace(hrp.Position)
-                local angle = math.atan2(relativePos.Y, relativePos.X) + math.pi/2
+                local angle = math.atan2(relativePos.Y, relativePos.X)
                 local radius = Options.OOF_Radius.Value
+                local size = Options.OOF_Size.Value
                 
-                local cos = math.cos(angle)
-                local sin = math.sin(angle)
+                local dir = Vector2.new(math.cos(angle), -math.sin(angle))
+                local perp = Vector2.new(-dir.Y, dir.X)
                 
-                local arrowPos = screenCenter + Vector2.new(cos, sin) * radius
-                local arrowSize = Options.OOF_Size.Value
+                local arrowPos = screenCenter + (dir * radius)
+                local basePos = arrowPos - (dir * size)
                 
-                local point1 = arrowPos + Vector2.new(math.cos(angle) * arrowSize, math.sin(angle) * arrowSize)
-                local point2 = arrowPos + Vector2.new(math.cos(angle + 2.5) * (arrowSize/1.5), math.sin(angle + 2.5) * (arrowSize/1.5))
-                local point3 = arrowPos + Vector2.new(math.cos(angle - 2.5) * (arrowSize/1.5), math.sin(angle - 2.5) * (arrowSize/1.5))
-
-                objects.OOF.PointA = point1
-                objects.OOF.PointB = point2
-                objects.OOF.PointC = point3
+                objects.OOF.PointA = arrowPos
+                objects.OOF.PointB = basePos + (perp * (size * 0.5))
+                objects.OOF.PointC = basePos - (perp * (size * 0.5))
                 objects.OOF.Color = Options.OOFColor.Value
                 objects.OOF.Visible = true
             else
