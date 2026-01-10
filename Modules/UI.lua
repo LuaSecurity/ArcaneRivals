@@ -371,9 +371,16 @@ function UI:SetupMovement()
 
     local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
     HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" })
-    HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = 5, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius", Default = 20, Min = 5, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 5, Min = 1, Max = 20, Rounding = 1 })
+    HoverGroup:AddToggle("Hover_Visuals", { Text = "Show Visuals (3D Ring)" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
+    HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = -50, Max = 50, Rounding = 1 })
+    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius (Distance)", Default = 20, Min = 5, Max = 50, Rounding = 1 })
+    HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 30, Min = 1, Max = 120, Rounding = 0, Suffix = " RPM" })
+
+    -- 3D Circle Cache
+    local HoverRingCache = {}
+    for i = 1, 32 do
+        table.insert(HoverRingCache, DrawingHandler:Line({Thickness = 1, Visible = false}))
+    end
 
     RunService.Heartbeat:Connect(function(dt)
         local char = LocalPlayer.Character
@@ -468,31 +475,58 @@ function UI:SetupMovement()
             end
 
             if target then
-                local angle = tick() * Options.Hover_Speed.Value
+                -- Calculation (RPM to Angular)
+                local rpm = Options.Hover_Speed.Value
+                local theta = tick() * (rpm / 60) * (math.pi * 2) 
                 local radius = Options.Hover_Radius.Value
-                local offset = Vector3.new(math.cos(angle) * radius, Options.Hover_Offset.Value, math.sin(angle) * radius)
-                local targetPos = target.Position + offset
+                local height = Options.Hover_Offset.Value
                 
-                local dir = (targetPos - hrp.Position)
-                if dir.Magnitude > 1 then
-                    hrp.Velocity = dir.Unit * 60
+                -- Position Calculation
+                local offsetX = math.cos(theta) * radius
+                local offsetZ = math.sin(theta) * radius
+                local targetPos = target.Position + Vector3.new(offsetX, height, offsetZ)
+                
+                -- Apply Movement (CFrame based, looking at target)
+                hrp.CFrame = CFrame.lookAt(targetPos, target.Position)
+                hrp.Velocity = Vector3.zero 
+                hrp.RotVelocity = Vector3.zero
+
+                -- 3D Ring Visuals
+                if Toggles.Hover_Visuals.Value then
+                    local center = target.Position
+                    local segments = #HoverRingCache
+                    
+                    for i = 1, segments do
+                        local line = HoverRingCache[i]
+                        local a1 = (i / segments) * (math.pi * 2)
+                        local a2 = ((i + 1) / segments) * (math.pi * 2)
+                        
+                        -- Draw circle at target base (or height? usually base is better for reference)
+                        -- Let's draw it at the hover height to visualize path
+                        local h = height
+                        local p1 = center + Vector3.new(math.cos(a1)*radius, h, math.sin(a1)*radius)
+                        local p2 = center + Vector3.new(math.cos(a2)*radius, h, math.sin(a2)*radius)
+                        
+                        local v1, vis1 = Camera:WorldToViewportPoint(p1)
+                        local v2, vis2 = Camera:WorldToViewportPoint(p2)
+                        
+                        if vis1 and vis2 then
+                            line.Visible = true
+                            line.From = Vector2.new(v1.X, v1.Y)
+                            line.To = Vector2.new(v2.X, v2.Y)
+                            line.Color = Options.Hover_RingColor.Value
+                        else
+                            line.Visible = false
+                        end
+                    end
                 else
-                     hrp.CFrame = CFrame.new(targetPos, target.Position)
-                     hrp.Velocity = Vector3.zero
+                    for _, line in ipairs(HoverRingCache) do line.Visible = false end
                 end
-                
-                local bg = hrp:FindFirstChild("ArcaneHoverGyro") or Instance.new("BodyGyro")
-                bg.Name = "ArcaneHoverGyro"
-                bg.Parent = hrp
-                bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-                bg.CFrame = CFrame.lookAt(hrp.Position, target.Position)
             else
-                local bg = hrp:FindFirstChild("ArcaneHoverGyro")
-                if bg then bg:Destroy() end
+                for _, line in ipairs(HoverRingCache) do line.Visible = false end
             end
         else
-            local bg = hrp and hrp:FindFirstChild("ArcaneHoverGyro")
-            if bg then bg:Destroy() end
+            for _, line in ipairs(HoverRingCache) do line.Visible = false end
         end
     end)
 end
