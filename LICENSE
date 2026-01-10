@@ -9,15 +9,15 @@ The software, including but not limited to its source code, executable code, int
 
 2. GRANT OF LICENSE
 
-Subject to your compliance with the terms of this Agreement, the Owner grants you a personal, non-exclusive, non-transferable, and limited license to install and execute the Software solely for your personal, non-commercial use.
+Subject to your compliance with the terms of this Agreement, the Owner grants you a personal, non-exclusive, non-transferable, and limited license to install and execute the Software solely for your personal, non-commercial use within a compatible execution environment.
 
 3. RESTRICTIONS ON USE
 
 You are expressly prohibited from, and you shall not allow any third party to:
 
 * Unauthorized Use: Use the Software for any purpose other than those expressly permitted in Section 2.
-* Modification: Decompile, reverse engineer, disassemble, attempt to derive the source code of, decrypt, or create derivative works based on the Software or any part thereof.
-* Forks and Distribution: Create "forks," clones, or variations of the Software. You may not distribute, sublicense, rent, lease, lend, sell, or otherwise transfer the Software to any third party.
+* Modification: Decompile, reverse engineer, disassemble, attempt to derive the source code of, decrypt, or create derivative works based on the Software or any part thereof. This includes the use of "un-obfuscators" or "dumpers" to view the internal logic.
+* Forks and Distribution: Create "forks," clones, or variations of the Software. You may not distribute, sublicense, rent, lease, lend, sell, or otherwise transfer the Software to any third party or host it on public "script hubs" without permission.
 * Removal of Notices: Remove, alter, or obscure any copyright, trademark, or proprietary notices contained within or on the Software.
 
 4. TERMINATION
@@ -30,11 +30,11 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 6. LIMITATION OF LIABILITY
 
-TO THE EXTENT NOT PROHIBITED BY LAW, IN NO EVENT SHALL THE OWNER BE LIABLE FOR PERSONAL INJURY, OR ANY INCIDENTAL, SPECIAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER, INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF PROFITS, LOSS OF DATA, BUSINESS INTERRUPTION, OR ANY OTHER COMMERCIAL DAMAGES OR LOSSES, ARISING OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+TO THE EXTENT NOT PROHIBITED BY LAW, IN NO EVENT SHALL THE OWNER BE LIABLE FOR PERSONAL INJURY, OR ANY INCIDENTAL, SPECIAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER, INCLUDING, WITHOUT LIMITATION, DAMAGES FOR LOSS OF PROFITS, LOSS OF DATA, BUSINESS INTERRUPTION, OR ANY OTHER COMMERCIAL DAMAGES OR LOSSES, ARISING OUT OF OR RELATED TO YOUR USE OR INABILITY TO USE THE SOFTWARE.
 
 7. GOVERNING LAW
 
-This License shall be governed by and construed in accordance with the laws of your local jurisdiction, excluding its conflict of law principles. Any legal action or proceeding arising under this License will be brought exclusively in the courts where the Owner resides.
+This License shall be governed by and construed in accordance with the laws of the jurisdiction in which the Owner resides, excluding its conflict of law principles. Any legal action or proceeding arising under this License will be brought exclusively in the courts where the Owner resides.
 
 8. ENTIRE AGREEMENT
 
