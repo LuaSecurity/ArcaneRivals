@@ -12,6 +12,7 @@ local DrawingHandler = DrawingAPIClass.new()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local CoreGui = game:GetService("CoreGui")
+local UserInputService = game:GetService("UserInputService")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -348,6 +349,150 @@ function UI:SetupVisuals()
             else
                 highlight.Enabled = false
             end
+        end
+    end)
+end
+
+function UI:SetupMovement()
+    local MoveTab = self:CreateTab("Movement")
+
+    local SpeedGroup = MoveTab:AddLeftGroupbox("Speed")
+    SpeedGroup:AddToggle("Speed_Enabled", { Text = "Enabled" })
+    SpeedGroup:AddDropdown("Speed_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
+    SpeedGroup:AddSlider("Speed_Value", { Text = "Speed", Default = 16, Min = 16, Max = 200, Rounding = 1 })
+
+    local FlyGroup = MoveTab:AddLeftGroupbox("Fly")
+    FlyGroup:AddToggle("Fly_Enabled", { Text = "Enabled" })
+    FlyGroup:AddDropdown("Fly_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
+    FlyGroup:AddSlider("Fly_Speed", { Text = "Speed", Default = 50, Min = 10, Max = 200, Rounding = 1 })
+
+    local BhopGroup = MoveTab:AddRightGroupbox("Bhop")
+    BhopGroup:AddToggle("Bhop_Enabled", { Text = "Enabled" })
+
+    local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
+    HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" })
+    HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = 5, Max = 50, Rounding = 1 })
+    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius", Default = 20, Min = 5, Max = 50, Rounding = 1 })
+    HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 5, Min = 1, Max = 20, Rounding = 1 })
+
+    RunService.Heartbeat:Connect(function(dt)
+        local char = LocalPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChild("Humanoid")
+        
+        if not char or not hrp or not hum then return end
+
+        if Toggles.Speed_Enabled.Value then
+            local moveDir = hum.MoveDirection
+            if Options.Speed_Mode.Value == "Velocity" then
+                if moveDir.Magnitude > 0 then
+                    hrp.Velocity = Vector3.new(moveDir.X * Options.Speed_Value.Value, hrp.Velocity.Y, moveDir.Z * Options.Speed_Value.Value)
+                end
+            elseif Options.Speed_Mode.Value == "CFrame" then
+                if moveDir.Magnitude > 0 then
+                    hrp.CFrame = hrp.CFrame + (moveDir * (Options.Speed_Value.Value * dt))
+                end
+            end
+        end
+
+        if Toggles.Fly_Enabled.Value then
+            local camCF = Camera.CFrame
+            local speed = Options.Fly_Speed.Value
+            local velocity = Vector3.zero
+
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                velocity = velocity + camCF.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                velocity = velocity - camCF.LookVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+                velocity = velocity - camCF.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+                velocity = velocity + camCF.RightVector
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                velocity = velocity + Vector3.new(0, 1, 0)
+            end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                velocity = velocity - Vector3.new(0, 1, 0)
+            end
+
+            if Options.Fly_Mode.Value == "Velocity" then
+                hrp.Velocity = velocity * speed
+                local bv = hrp:FindFirstChild("ArcaneFlyVelocity") or Instance.new("BodyVelocity")
+                bv.Name = "ArcaneFlyVelocity"
+                bv.Parent = hrp
+                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                bv.Velocity = velocity * speed
+            elseif Options.Fly_Mode.Value == "CFrame" then
+                local bv = hrp:FindFirstChild("ArcaneFlyVelocity")
+                if bv then bv:Destroy() end
+                
+                hrp.Anchored = true
+                hrp.CFrame = hrp.CFrame + (velocity * (speed * dt))
+            end
+        else
+            local bv = hrp and hrp:FindFirstChild("ArcaneFlyVelocity")
+            if bv then bv:Destroy() end
+            if Options.Fly_Mode.Value == "CFrame" and hrp then
+                 hrp.Anchored = false
+            end
+        end
+
+        if Toggles.Bhop_Enabled.Value then
+            if hum.FloorMaterial ~= Enum.Material.Air then
+                hum.Jump = true
+            end
+        end
+
+        if Toggles.Hover_Enabled.Value then
+            local target = nil
+            local minDist = math.huge
+            
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and not IsSameTeam(p) then
+                    local pch = p.Character
+                    local phrp = pch and pch:FindFirstChild("HumanoidRootPart")
+                    local phum = pch and pch:FindFirstChild("Humanoid")
+                    
+                    if phrp and phum and phum.Health > 0 then
+                        local d = (hrp.Position - phrp.Position).Magnitude
+                        if d < minDist then
+                            minDist = d
+                            target = phrp
+                        end
+                    end
+                end
+            end
+
+            if target then
+                local angle = tick() * Options.Hover_Speed.Value
+                local radius = Options.Hover_Radius.Value
+                local offset = Vector3.new(math.cos(angle) * radius, Options.Hover_Offset.Value, math.sin(angle) * radius)
+                local targetPos = target.Position + offset
+                
+                local dir = (targetPos - hrp.Position)
+                if dir.Magnitude > 1 then
+                    hrp.Velocity = dir.Unit * 60
+                else
+                     hrp.CFrame = CFrame.new(targetPos, target.Position)
+                     hrp.Velocity = Vector3.zero
+                end
+                
+                local bg = hrp:FindFirstChild("ArcaneHoverGyro") or Instance.new("BodyGyro")
+                bg.Name = "ArcaneHoverGyro"
+                bg.Parent = hrp
+                bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+                bg.CFrame = CFrame.lookAt(hrp.Position, target.Position)
+            else
+                local bg = hrp:FindFirstChild("ArcaneHoverGyro")
+                if bg then bg:Destroy() end
+            end
+        else
+            local bg = hrp and hrp:FindFirstChild("ArcaneHoverGyro")
+            if bg then bg:Destroy() end
         end
     end)
 end
