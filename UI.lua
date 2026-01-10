@@ -1,0 +1,240 @@
+local UI = {}
+UI.__index = UI
+
+local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+
+local DrawingAPIClass = loadstring(game:HttpGet("https://raw.githubusercontent.com/LuaSecurity/ArcaneRivals/refs/heads/main/Modules/Drawing.lua"))()
+local DrawingHandler = DrawingAPIClass.new()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+function UI.new(title)
+    local self = setmetatable({}, UI)
+    
+    -- This is the ONLY place CreateWindow should be called
+    self.Window = Library:CreateWindow({
+        Title = title or "Arcane",
+        Center = true,
+        AutoShow = true,
+        TabPadding = 8,
+        MenuFadeTime = 0.2
+    })
+
+    self.Tabs = {}
+    self.ESP_Cache = {}
+    
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    
+    return self
+end
+
+function UI:CreateTab(name)
+    if self.Tabs[name] then return self.Tabs[name] end
+    local tab = self.Window:AddTab(name)
+    self.Tabs[name] = tab
+    return tab
+end
+
+local function IsSameTeam(player)
+    if not player or not LocalPlayer then return false end
+    local myTeam = LocalPlayer:GetAttribute("TeamID")
+    local theirTeam = player:GetAttribute("TeamID")
+    return myTeam ~= nil and theirTeam ~= nil and myTeam == theirTeam
+end
+
+function UI:SetupVisuals()
+    local VisualsTab = self:CreateTab("Visuals")
+    
+    local EspGroup = VisualsTab:AddLeftGroupbox("ESP Main")
+    EspGroup:AddToggle("Esp_Enabled", { Text = "Enabled", Default = false })
+    EspGroup:AddToggle("Esp_TeamCheck", { Text = "Team Check", Default = true })
+    EspGroup:AddToggle("Esp_DistLimitEnabled", { Text = "Use Distance Limit", Default = false })
+    EspGroup:AddSlider("Esp_MaxDist", { Text = "Max Distance", Default = 500, Min = 100, Max = 5000, Rounding = 0 })
+    EspGroup:AddDivider()
+    EspGroup:AddToggle("Esp_Box", { Text = "Box" }):AddColorPicker("BoxColor", { Default = Color3.new(1,1,1) })
+    EspGroup:AddToggle("Esp_Name", { Text = "Name" }):AddColorPicker("NameColor", { Default = Color3.new(1,1,1) })
+    EspGroup:AddToggle("Esp_Distance", { Text = "Distance" }):AddColorPicker("DistanceColor", { Default = Color3.new(1,1,1) })
+    EspGroup:AddToggle("Esp_HealthBar", { Text = "Health Bar" }):AddColorPicker("HealthColor", { Default = Color3.new(0,1,0) })
+    
+    local TracerGroup = VisualsTab:AddRightGroupbox("Bullet Effects")
+    TracerGroup:AddToggle("CustomTracers", { Text = "Bullet Tracers" })
+    TracerGroup:AddLabel("Tracer Color"):AddColorPicker("Tracer_Color", { Default = Color3.fromRGB(255, 255, 255) })
+    TracerGroup:AddSlider("Tracer_Thickness", { Text = "Thickness", Default = 0.03, Min = 0.01, Max = 0.5, Rounding = 3 })
+    TracerGroup:AddSlider("Tracer_Duration", { Text = "Lifetime (s)", Default = 1.5, Min = 0.1, Max = 5, Rounding = 1 })
+
+    local MiscVisuals = VisualsTab:AddRightGroupbox("Visuals Extras")
+    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers (Lines)" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
+    MiscVisuals:AddDropdown("Tracer_Origin", { Text = "Line Origin", Default = "Bottom", Values = {"Top", "Center", "Bottom"} })
+    MiscVisuals:AddDivider()
+    MiscVisuals:AddToggle("Esp_OOF", { Text = "Off-Screen Indicators" }):AddColorPicker("OOFColor", { Default = Color3.new(1,1,1) })
+    MiscVisuals:AddSlider("OOF_Radius", { Text = "OOF Radius", Default = 200, Min = 50, Max = 600, Rounding = 0 })
+    MiscVisuals:AddSlider("OOF_Size", { Text = "OOF Arrow Size", Default = 15, Min = 5, Max = 50, Rounding = 0 })
+
+    local function RemovePlayerESP(player)
+        if self.ESP_Cache[player] then
+            for _, obj in pairs(self.ESP_Cache[player]) do
+                if obj.Remove then obj:Remove() end
+            end
+            self.ESP_Cache[player] = nil
+        end
+    end
+
+    local function CreatePlayerESP(player)
+        if player == LocalPlayer then return end
+        RemovePlayerESP(player)
+        self.ESP_Cache[player] = {
+            Box = DrawingHandler:Square({ Thickness = 1, Visible = false }),
+            BoxOutline = DrawingHandler:Square({ Thickness = 3, Color = Color3.new(0,0,0), Visible = false }),
+            Name = DrawingHandler:Text({ Size = 14, Center = true, Outline = true, Visible = false }),
+            Distance = DrawingHandler:Text({ Size = 13, Center = true, Outline = true, Visible = false }),
+            HealthBar = DrawingHandler:Line({ Thickness = 2, Visible = false }),
+            HealthBg = DrawingHandler:Line({ Thickness = 2, Color = Color3.new(0,0,0), Visible = false }),
+            Tracer = DrawingHandler:Line({ Thickness = 1, Visible = false }),
+            OOF = DrawingHandler:Triangle({ Thickness = 1, Filled = true, Visible = false })
+        }
+    end
+
+    Players.PlayerAdded:Connect(CreatePlayerESP)
+    Players.PlayerRemoving:Connect(RemovePlayerESP)
+    for _, p in ipairs(Players:GetPlayers()) do CreatePlayerESP(p) end
+
+    RunService.RenderStepped:Connect(function()
+        local enabled = Toggles.Esp_Enabled and Toggles.Esp_Enabled.Value
+        if not enabled then 
+            for _, objects in pairs(self.ESP_Cache) do
+                for _, obj in pairs(objects) do obj.Visible = false end
+            end
+            return 
+        end
+
+        local camCF = Camera.CFrame
+        local viewportSize = Camera.ViewportSize
+        local screenCenter = viewportSize / 2
+
+        for player, objects in pairs(self.ESP_Cache) do
+            local char = player.Character
+            local hum = char and char:FindFirstChild("Humanoid")
+            local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+            if not char or not hrp or not hum or hum.Health <= 0 or (Toggles.Esp_TeamCheck.Value and IsSameTeam(player)) then
+                for _, obj in pairs(objects) do obj.Visible = false end
+                continue
+            end
+
+            local dist = (camCF.Position - hrp.Position).Magnitude
+            if Toggles.Esp_DistLimitEnabled.Value and dist > Options.Esp_MaxDist.Value then
+                for _, obj in pairs(objects) do obj.Visible = false end
+                continue
+            end
+
+            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+            
+            if Toggles.Esp_OOF.Value and not onScreen then
+                local relativePos = camCF:PointToObjectSpace(hrp.Position)
+                local angle = math.atan2(-relativePos.X, relativePos.Z)
+                local drawPos = screenCenter + Vector2.new(math.sin(angle), math.cos(angle)) * Options.OOF_Radius.Value
+                local dir = (drawPos - screenCenter).Unit
+                local side = Vector2.new(-dir.Y, dir.X)
+                local size = Options.OOF_Size.Value
+                
+                objects.OOF.PointA = drawPos
+                objects.OOF.PointB = drawPos - (dir * size) + (side * (size/1.5))
+                objects.OOF.PointC = drawPos - (dir * size) - (side * (size/1.5))
+                objects.OOF.Color = Options.OOFColor.Value
+                objects.OOF.Visible = true
+            else
+                objects.OOF.Visible = false
+            end
+
+            if onScreen then
+                local head = char:FindFirstChild("Head") or hrp
+                local headPos = Camera:WorldToViewportPoint(head.Position + Vector3.new(0, 0.5, 0))
+                local legPos = Camera:WorldToViewportPoint(hrp.Position - Vector3.new(0, 3, 0))
+                local h = math.abs(headPos.Y - legPos.Y)
+                local w = h * 0.6
+                local boxPos = Vector2.new(pos.X - w/2, pos.Y - h/2)
+                local scale = math.clamp(1 / (dist / 100), 0.2, 1.5)
+
+                objects.Box.Visible = Toggles.Esp_Box.Value
+                objects.Box.Position = boxPos
+                objects.Box.Size = Vector2.new(w, h)
+                objects.Box.Color = Options.BoxColor.Value
+                
+                objects.BoxOutline.Visible = Toggles.Esp_Box.Value
+                objects.BoxOutline.Position = boxPos
+                objects.BoxOutline.Size = Vector2.new(w, h)
+
+                objects.Name.Visible = Toggles.Esp_Name.Value
+                objects.Name.Position = Vector2.new(pos.X, boxPos.Y - 15)
+                objects.Name.Text = player.Name
+                objects.Name.Color = Options.NameColor.Value
+
+                objects.Distance.Visible = Toggles.Esp_Distance.Value
+                objects.Distance.Position = Vector2.new(pos.X, boxPos.Y + h + 2)
+                objects.Distance.Text = math.floor(dist) .. "m"
+                objects.Distance.Color = Options.DistanceColor.Value
+
+                if Toggles.Esp_HealthBar.Value then
+                    local hpPercent = hum.Health / hum.MaxHealth
+                    objects.HealthBg.Visible = true
+                    objects.HealthBg.From = Vector2.new(boxPos.X - 5, boxPos.Y + h)
+                    objects.HealthBg.To = Vector2.new(boxPos.X - 5, boxPos.Y)
+                    objects.HealthBar.Visible = true
+                    objects.HealthBar.From = Vector2.new(boxPos.X - 5, boxPos.Y + h)
+                    objects.HealthBar.To = Vector2.new(boxPos.X - 5, boxPos.Y + h - (h * hpPercent))
+                    objects.HealthBar.Color = Options.HealthColor.Value
+                else
+                    objects.HealthBar.Visible = false
+                    objects.HealthBg.Visible = false
+                end
+
+                if Toggles.Esp_Tracers.Value then
+                    local originY = (Options.Tracer_Origin.Value == "Top" and 0) or (Options.Tracer_Origin.Value == "Center" and viewportSize.Y / 2) or viewportSize.Y
+                    objects.Tracer.Visible = true
+                    objects.Tracer.From = Vector2.new(viewportSize.X / 2, originY)
+                    objects.Tracer.To = Vector2.new(pos.X, pos.Y + h/2)
+                    objects.Tracer.Color = Options.TracerColor.Value
+                else
+                    objects.Tracer.Visible = false
+                end
+            else
+                objects.Box.Visible = false
+                objects.BoxOutline.Visible = false
+                objects.Name.Visible = false
+                objects.Distance.Visible = false
+                objects.HealthBar.Visible = false
+                objects.HealthBg.Visible = false
+                objects.Tracer.Visible = false
+            end
+        end
+    end)
+end
+
+function UI:SetupSettings(folder, tabName)
+    local targetTab = self:CreateTab(tabName)
+    ThemeManager:SetFolder(folder)
+    SaveManager:SetFolder(folder .. "/configs")
+    SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
+    SaveManager:BuildConfigSection(targetTab)
+    ThemeManager:ApplyToTab(targetTab)
+    
+    local menuGroup = targetTab:AddLeftGroupbox('Menu')
+    menuGroup:AddButton('Unload', function() Library:Unload() end)
+    menuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightShift', NoUI = true, Text = 'Menu keybind' })
+    Library.ToggleKeybind = Options.MenuKeybind
+    SaveManager:LoadAutoloadConfig()
+end
+
+function UI:Notify(text, time)
+    Library:Notify(text, time or 5)
+end
+
+return UI
