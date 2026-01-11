@@ -20,7 +20,7 @@ function UI.new(title)
     local self = setmetatable({}, UI)
     
     self.Window = Library:CreateWindow({
-        Title = title or "Arcane",
+        Title = title or "Arcane Remastered",
         Center = true,
         AutoShow = true,
         TabPadding = 8,
@@ -51,36 +51,18 @@ local function IsSameTeam(player)
     return myTeam ~= nil and theirTeam ~= nil and myTeam == theirTeam
 end
 
-local function GetCharacterExtents(character)
-    local cf, size = character:GetBoundingBox()
-    local corners = {
-        cf * CFrame.new(size.X/2, size.Y/2, size.Z/2),
-        cf * CFrame.new(size.X/2, size.Y/2, -size.Z/2),
-        cf * CFrame.new(size.X/2, -size.Y/2, size.Z/2),
-        cf * CFrame.new(size.X/2, -size.Y/2, -size.Z/2),
-        cf * CFrame.new(-size.X/2, size.Y/2, size.Z/2),
-        cf * CFrame.new(-size.X/2, size.Y/2, -size.Z/2),
-        cf * CFrame.new(-size.X/2, -size.Y/2, size.Z/2),
-        cf * CFrame.new(-size.X/2, -size.Y/2, -size.Z/2),
+-- Helper to calculate corners of a CFrame + Size
+local function GetCorners(cf, size)
+    local corners = {}
+    local x, y, z = size.X / 2, size.Y / 2, size.Z / 2
+    local factors = {
+        Vector3.new(-x, -y, -z), Vector3.new(-x, -y, z), Vector3.new(-x, y, -z), Vector3.new(-x, y, z),
+        Vector3.new(x, -y, -z), Vector3.new(x, -y, z), Vector3.new(x, y, -z), Vector3.new(x, y, z)
     }
-    
-    local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
-    local screenCorners = {}
-    local onScreenCount = 0
-
-    for _, corner in ipairs(corners) do
-        local pos, onScreen = Camera:WorldToViewportPoint(corner.Position)
-        if onScreen then onScreenCount = onScreenCount + 1 end
-        
-        table.insert(screenCorners, Vector2.new(pos.X, pos.Y))
-        
-        if pos.X < minX then minX = pos.X end
-        if pos.X > maxX then maxX = pos.X end
-        if pos.Y < minY then minY = pos.Y end
-        if pos.Y > maxY then maxY = pos.Y end
+    for _, factor in ipairs(factors) do
+        table.insert(corners, (cf * CFrame.new(factor)).Position)
     end
-
-    return onScreenCount > 0, minX, minY, maxX - minX, maxY - minY, screenCorners
+    return corners
 end
 
 function UI:SetupVisuals()
@@ -89,38 +71,32 @@ function UI:SetupVisuals()
     local EspGroup = VisualsTab:AddLeftGroupbox("ESP Main")
     EspGroup:AddToggle("Esp_Enabled", { Text = "Enabled", Default = false })
     EspGroup:AddToggle("Esp_TeamCheck", { Text = "Team Check", Default = true })
-    EspGroup:AddToggle("Esp_DistLimitEnabled", { Text = "Use Distance Limit", Default = false })
-    EspGroup:AddSlider("Esp_MaxDist", { Text = "Max Distance", Default = 500, Min = 100, Max = 5000, Rounding = 0 })
+    EspGroup:AddSlider("Esp_MaxDist", { Text = "Max Distance", Default = 1000, Min = 100, Max = 5000, Rounding = 0 })
     EspGroup:AddDivider()
     
-    EspGroup:AddToggle("Esp_Box", { Text = "Box" }):AddColorPicker("BoxColor", { Default = Color3.new(1,1,1) })
-    EspGroup:AddDropdown("Box_Mode", { Text = "Box Mode", Default = "2D", Values = {"2D", "Corner", "3D"} })
+    -- BOX SETTINGS
+    EspGroup:AddDropdown("Esp_BoxType", { Values = { "2D Box", "Corner Box", "3D Box" }, Default = "2D Box", Text = "Box Type" })
+    EspGroup:AddToggle("Esp_Box", { Text = "Draw Box" }):AddColorPicker("BoxColor", { Default = Color3.new(1,1,1) })
     EspGroup:AddToggle("Esp_BoxFill", { Text = "Box Fill" }):AddColorPicker("BoxFillColor", { Default = Color3.new(1, 0, 0), Transparency = 0.5 })
     
+    -- INFO SETTINGS
     EspGroup:AddToggle("Esp_Name", { Text = "Name" }):AddColorPicker("NameColor", { Default = Color3.new(1,1,1) })
     EspGroup:AddToggle("Esp_Distance", { Text = "Distance" }):AddColorPicker("DistanceColor", { Default = Color3.new(1,1,1) })
-    EspGroup:AddToggle("Esp_HealthBar", { Text = "Health Bar" }):AddColorPicker("HealthBarColor", { Default = Color3.new(0, 1, 0) })
+    EspGroup:AddToggle("Esp_HealthBar", { Text = "Health Bar" }):AddColorPicker("HealthBarColor", { Default = Color3.fromRGB(0, 255, 0) })
     EspGroup:AddToggle("Esp_Skeleton", { Text = "Skeleton" }):AddColorPicker("SkeletonColor", { Default = Color3.new(1,1,1) })
-    
+
     local ChamsGroup = VisualsTab:AddLeftGroupbox("Chams")
     ChamsGroup:AddToggle("Chams_Enabled", { Text = "Enabled" })
     ChamsGroup:AddToggle("Chams_Fill", { Text = "Fill" }):AddColorPicker("ChamsFillColor", { Default = Color3.fromRGB(150, 0, 0), Transparency = 0.5 })
     ChamsGroup:AddToggle("Chams_Outline", { Text = "Outline" }):AddColorPicker("ChamsOutlineColor", { Default = Color3.fromRGB(255, 0, 0), Transparency = 0 })
-    ChamsGroup:AddToggle("Chams_Occluded", { Text = "Occluded (Wallcheck)", Default = true })
-
-    local TracerGroup = VisualsTab:AddRightGroupbox("Bullet Effects")
-    TracerGroup:AddToggle("CustomTracers", { Text = "Bullet Tracers" })
-    TracerGroup:AddLabel("Tracer Color"):AddColorPicker("Tracer_Color", { Default = Color3.fromRGB(255, 255, 255) })
-    TracerGroup:AddSlider("Tracer_Thickness", { Text = "Thickness", Default = 0.03, Min = 0.01, Max = 0.5, Rounding = 3 })
-    TracerGroup:AddSlider("Tracer_Duration", { Text = "Lifetime (s)", Default = 1.5, Min = 0.1, Max = 5, Rounding = 1 })
+    ChamsGroup:AddToggle("Chams_Occluded", { Text = "Visible Check", Default = true })
 
     local MiscVisuals = VisualsTab:AddRightGroupbox("Visuals Extras")
-    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers (Lines)" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
+    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
     MiscVisuals:AddDropdown("Tracer_Origin", { Text = "Line Origin", Default = "Bottom", Values = {"Top", "Center", "Bottom"} })
     MiscVisuals:AddDivider()
     MiscVisuals:AddToggle("Esp_OOF", { Text = "Off-Screen Indicators" }):AddColorPicker("OOFColor", { Default = Color3.new(1,1,1) })
     MiscVisuals:AddSlider("OOF_Radius", { Text = "OOF Radius", Default = 200, Min = 50, Max = 600, Rounding = 0 })
-    MiscVisuals:AddSlider("OOF_Size", { Text = "OOF Arrow Size", Default = 15, Min = 5, Max = 50, Rounding = 0 })
 
     local skeletonLinks = {
         {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
@@ -133,17 +109,16 @@ function UI:SetupVisuals()
     local function RemovePlayerESP(player)
         if self.ESP_Cache[player] then
             for _, obj in pairs(self.ESP_Cache[player].Drawings) do
-                if obj.Remove then obj:Remove() end
+                if type(obj) == "table" and obj.Remove then obj:Remove() end
             end
-            for _, line in pairs(self.ESP_Cache[player].Skeleton) do
-                if line.Remove then line:Remove() end
+            if self.ESP_Cache[player].Box3D then
+                for _, line in pairs(self.ESP_Cache[player].Box3D) do line:Remove() end
             end
-            for _, line in pairs(self.ESP_Cache[player].Box3D) do
-                if line.Remove then line:Remove() end
+            if self.ESP_Cache[player].BoxCorners then
+                for _, line in pairs(self.ESP_Cache[player].BoxCorners) do line:Remove() end
             end
-            for _, line in pairs(self.ESP_Cache[player].CornerBox) do
-                if line.Remove then line:Remove() end
-            end
+            for _, line in pairs(self.ESP_Cache[player].Skeleton) do line:Remove() end
+            
             if self.ESP_Cache[player].Highlight then
                 self.ESP_Cache[player].Highlight:Destroy()
             end
@@ -158,10 +133,6 @@ function UI:SetupVisuals()
         local highlight = Instance.new("Highlight")
         highlight.Name = "ArcaneChams"
         highlight.FillColor = Color3.fromRGB(255, 0, 0)
-        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-        highlight.FillTransparency = 0.5
-        highlight.OutlineTransparency = 0
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         highlight.Enabled = false
 
         self.ESP_Cache[player] = {
@@ -175,15 +146,20 @@ function UI:SetupVisuals()
                 Tracer = DrawingHandler:Line({ Thickness = 1, Visible = false }),
                 OOF = DrawingHandler:Triangle({ Thickness = 1, Filled = true, Visible = false })
             },
-            Skeleton = {},
             Box3D = {},
-            CornerBox = {},
+            BoxCorners = {},
+            Skeleton = {},
             Highlight = highlight
         }
 
+        -- Pre-create 12 lines for 3D box
+        for i = 1, 12 do table.insert(self.ESP_Cache[player].Box3D, DrawingHandler:Line({ Thickness = 1, Visible = false })) end
+        
+        -- Pre-create 8 lines for Corner Box (4 corners x 2 lines each)
+        for i = 1, 8 do table.insert(self.ESP_Cache[player].BoxCorners, DrawingHandler:Line({ Thickness = 1, Visible = false })) end
+
+        -- Pre-create skeleton lines
         for i = 1, 14 do table.insert(self.ESP_Cache[player].Skeleton, DrawingHandler:Line({ Thickness = 1, Visible = false, Color = Color3.new(1,1,1) })) end
-        for i = 1, 12 do table.insert(self.ESP_Cache[player].Box3D, DrawingHandler:Line({ Thickness = 1, Visible = false, Color = Color3.new(1,1,1) })) end
-        for i = 1, 8 do table.insert(self.ESP_Cache[player].CornerBox, DrawingHandler:Line({ Thickness = 1, Visible = false, Color = Color3.new(1,1,1) })) end
     end
 
     Players.PlayerAdded:Connect(CreatePlayerESP)
@@ -195,49 +171,48 @@ function UI:SetupVisuals()
         
         for player, cache in pairs(self.ESP_Cache) do
             local objects = cache.Drawings
+            local lines3d = cache.Box3D
+            local corners2d = cache.BoxCorners
             local skeletonLines = cache.Skeleton
-            local box3dLines = cache.Box3D
-            local cornerLines = cache.CornerBox
             local highlight = cache.Highlight
 
-            local function HideAll()
+            -- Cleanup function to hide everything for this player
+            local function hideAll()
                 for _, obj in pairs(objects) do obj.Visible = false end
+                for _, line in pairs(lines3d) do line.Visible = false end
+                for _, line in pairs(corners2d) do line.Visible = false end
                 for _, line in pairs(skeletonLines) do line.Visible = false end
-                for _, line in pairs(box3dLines) do line.Visible = false end
-                for _, line in pairs(cornerLines) do line.Visible = false end
                 if highlight then highlight.Enabled = false end
             end
 
-            if not enabled then 
-                HideAll()
-                continue 
-            end
+            if not enabled then hideAll() continue end
 
             local char = player.Character
             local hum = char and char:FindFirstChild("Humanoid")
             local hrp = char and char:FindFirstChild("HumanoidRootPart")
 
             if not char or not hrp or not hum or hum.Health <= 0 or (Toggles.Esp_TeamCheck.Value and IsSameTeam(player)) then
-                HideAll()
+                hideAll()
                 continue
             end
 
             local dist = (Camera.CFrame.Position - hrp.Position).Magnitude
-            if Toggles.Esp_DistLimitEnabled.Value and dist > Options.Esp_MaxDist.Value then
-                HideAll()
+            if dist > Options.Esp_MaxDist.Value then
+                hideAll()
                 continue
             end
 
-            local onScreen, x, y, w, h, corners = GetCharacterExtents(char)
-            local pos = Vector2.new(x + w/2, y + h/2)
+            local _, onScreen = Camera:WorldToViewportPoint(hrp.Position)
             local viewportSize = Camera.ViewportSize
             local screenCenter = viewportSize / 2
 
+            -- Off Screen Indicators
             if Toggles.Esp_OOF.Value and not onScreen then
                 local relativePos = Camera.CFrame:PointToObjectSpace(hrp.Position)
                 local angle = math.atan2(relativePos.Y, relativePos.X)
                 local radius = Options.OOF_Radius.Value
-                local size = Options.OOF_Size.Value
+                local size = 15 -- standard size
+                
                 local dir = Vector2.new(math.cos(angle), -math.sin(angle))
                 local perp = Vector2.new(-dir.Y, dir.X)
                 local arrowPos = screenCenter + (dir * radius)
@@ -248,168 +223,191 @@ function UI:SetupVisuals()
                 objects.OOF.PointC = basePos - (perp * (size * 0.5))
                 objects.OOF.Color = Options.OOFColor.Value
                 objects.OOF.Visible = true
+                
+                -- Hide everything else
+                for k, v in pairs(objects) do if k ~= "OOF" then v.Visible = false end end
+                for _, l in pairs(lines3d) do l.Visible = false end
+                for _, l in pairs(corners2d) do l.Visible = false end
+                for _, l in pairs(skeletonLines) do l.Visible = false end
+                if highlight then highlight.Enabled = false end
+                continue
             else
                 objects.OOF.Visible = false
             end
 
-            if onScreen then
-                local boxMode = Options.Box_Mode.Value
-                local boxColor = Options.BoxColor.Value
+            -- Main ESP Calculation
+            local cf, size = char:GetBoundingBox()
+            local corners = GetCorners(cf, size)
+            local screenCorners = {}
+            local minX, minY, maxX, maxY = math.huge, math.huge, -math.huge, -math.huge
+            local allOnScreen = false
 
-                -- 2D Box
-                if Toggles.Esp_Box.Value and boxMode == "2D" then
+            for _, corner in ipairs(corners) do
+                local sPos, vis = Camera:WorldToViewportPoint(corner)
+                if vis then allOnScreen = true end
+                table.insert(screenCorners, Vector2.new(sPos.X, sPos.Y))
+                if sPos.X < minX then minX = sPos.X end
+                if sPos.Y < minY then minY = sPos.Y end
+                if sPos.X > maxX then maxX = sPos.X end
+                if sPos.Y > maxY then maxY = sPos.Y end
+            end
+
+            -- If totally offscreen despite checks
+            if not allOnScreen and not onScreen then 
+                hideAll()
+                continue
+            end
+
+            local boxWidth = maxX - minX
+            local boxHeight = maxY - minY
+            local boxSize = Vector2.new(boxWidth, boxHeight)
+            local boxPos = Vector2.new(minX, minY)
+            
+            -- Box Logic
+            local boxType = Options.Esp_BoxType.Value
+            local showBox = Toggles.Esp_Box.Value
+
+            -- Reset Box Viz
+            objects.Box.Visible = false
+            objects.BoxOutline.Visible = false
+            objects.BoxFilled.Visible = false
+            for _, l in pairs(lines3d) do l.Visible = false end
+            for _, l in pairs(corners2d) do l.Visible = false end
+
+            if showBox then
+                if boxType == "2D Box" then
                     objects.Box.Visible = true
-                    objects.Box.Position = Vector2.new(x, y)
-                    objects.Box.Size = Vector2.new(w, h)
-                    objects.Box.Color = boxColor
+                    objects.Box.Position = boxPos
+                    objects.Box.Size = boxSize
+                    objects.Box.Color = Options.BoxColor.Value
                     
                     objects.BoxOutline.Visible = true
-                    objects.BoxOutline.Position = Vector2.new(x, y)
-                    objects.BoxOutline.Size = Vector2.new(w, h)
-
+                    objects.BoxOutline.Position = boxPos
+                    objects.BoxOutline.Size = boxSize
+                    
                     if Toggles.Esp_BoxFill.Value then
                         objects.BoxFilled.Visible = true
-                        objects.BoxFilled.Position = Vector2.new(x, y)
-                        objects.BoxFilled.Size = Vector2.new(w, h)
+                        objects.BoxFilled.Position = boxPos
+                        objects.BoxFilled.Size = boxSize
                         objects.BoxFilled.Color = Options.BoxFillColor.Value
                         objects.BoxFilled.Transparency = Options.BoxFillColor.Transparency
-                    else
-                        objects.BoxFilled.Visible = false
-                    end
-                else
-                    objects.Box.Visible = false
-                    objects.BoxOutline.Visible = false
-                    objects.BoxFilled.Visible = false
-                end
-
-                -- Corner Box
-                if Toggles.Esp_Box.Value and boxMode == "Corner" then
-                    local lineL = math.min(w, h) / 3
-                    local tl = Vector2.new(x, y)
-                    local tr = Vector2.new(x + w, y)
-                    local bl = Vector2.new(x, y + h)
-                    local br = Vector2.new(x + w, y + h)
-
-                    local function DrawCorner(idx, p1, p2)
-                        local l = cornerLines[idx]
-                        l.Visible = true
-                        l.From = p1
-                        l.To = p2
-                        l.Color = boxColor
                     end
 
-                    DrawCorner(1, tl, tl + Vector2.new(lineL, 0))
-                    DrawCorner(2, tl, tl + Vector2.new(0, lineL))
-                    DrawCorner(3, tr, tr - Vector2.new(lineL, 0))
-                    DrawCorner(4, tr, tr + Vector2.new(0, lineL))
-                    DrawCorner(5, bl, bl + Vector2.new(lineL, 0))
-                    DrawCorner(6, bl, bl - Vector2.new(0, lineL))
-                    DrawCorner(7, br, br - Vector2.new(lineL, 0))
-                    DrawCorner(8, br, br - Vector2.new(0, lineL))
-                else
-                    for _, l in pairs(cornerLines) do l.Visible = false end
-                end
+                elseif boxType == "Corner Box" then
+                    local len = boxHeight / 5
+                    local c = Options.BoxColor.Value
+                    local th = 1
+                    
+                    -- Top Left
+                    corners2d[1].From = Vector2.new(minX, minY); corners2d[1].To = Vector2.new(minX + len, minY); corners2d[1].Visible = true; corners2d[1].Color = c
+                    corners2d[2].From = Vector2.new(minX, minY); corners2d[2].To = Vector2.new(minX, minY + len); corners2d[2].Visible = true; corners2d[2].Color = c
+                    -- Top Right
+                    corners2d[3].From = Vector2.new(maxX, minY); corners2d[3].To = Vector2.new(maxX - len, minY); corners2d[3].Visible = true; corners2d[3].Color = c
+                    corners2d[4].From = Vector2.new(maxX, minY); corners2d[4].To = Vector2.new(maxX, minY + len); corners2d[4].Visible = true; corners2d[4].Color = c
+                    -- Bottom Left
+                    corners2d[5].From = Vector2.new(minX, maxY); corners2d[5].To = Vector2.new(minX + len, maxY); corners2d[5].Visible = true; corners2d[5].Color = c
+                    corners2d[6].From = Vector2.new(minX, maxY); corners2d[6].To = Vector2.new(minX, maxY - len); corners2d[6].Visible = true; corners2d[6].Color = c
+                    -- Bottom Right
+                    corners2d[7].From = Vector2.new(maxX, maxY); corners2d[7].To = Vector2.new(maxX - len, maxY); corners2d[7].Visible = true; corners2d[7].Color = c
+                    corners2d[8].From = Vector2.new(maxX, maxY); corners2d[8].To = Vector2.new(maxX, maxY - len); corners2d[8].Visible = true; corners2d[8].Color = c
 
-                -- 3D Box
-                if Toggles.Esp_Box.Value and boxMode == "3D" then
-                    -- corners table from GetCharacterExtents has 8 Vector2s
-                    local c = corners
-                    -- Indices mapping for 3D box connections
+                elseif boxType == "3D Box" then
+                    -- 3D lines connection indices
                     local connections = {
-                        {1,2}, {2,4}, {4,3}, {3,1}, -- Top Face
-                        {5,6}, {6,8}, {8,7}, {7,5}, -- Bottom Face
-                        {1,5}, {2,6}, {3,7}, {4,8}  -- Pillars
+                        {1,2}, {2,4}, {4,3}, {3,1}, -- Top
+                        {5,6}, {6,8}, {8,7}, {7,5}, -- Bottom
+                        {1,5}, {2,6}, {3,7}, {4,8}  -- Sides
                     }
                     for i, conn in ipairs(connections) do
-                        local l = box3dLines[i]
-                        l.Visible = true
-                        l.From = c[conn[1]]
-                        l.To = c[conn[2]]
-                        l.Color = boxColor
+                        local p1 = screenCorners[conn[1]]
+                        local p2 = screenCorners[conn[2]]
+                        lines3d[i].Visible = true
+                        lines3d[i].From = p1
+                        lines3d[i].To = p2
+                        lines3d[i].Color = Options.BoxColor.Value
                     end
-                else
-                    for _, l in pairs(box3dLines) do l.Visible = false end
                 end
+            end
 
-                if Toggles.Esp_Name.Value then
-                    objects.Name.Visible = true
-                    objects.Name.Position = Vector2.new(x + w/2, y - 15)
-                    objects.Name.Text = player.Name
-                    objects.Name.Color = Options.NameColor.Value
-                else
-                    objects.Name.Visible = false
-                end
+            -- Health Bar
+            if Toggles.Esp_HealthBar.Value then
+                local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                local barHeight = boxHeight * hpPercent
+                
+                objects.HealthBar.Visible = true
+                objects.HealthBar.From = Vector2.new(minX - 5, maxY)
+                objects.HealthBar.To = Vector2.new(minX - 5, maxY - barHeight)
+                objects.HealthBar.Color = Options.HealthBarColor.Value
+            else
+                objects.HealthBar.Visible = false
+            end
 
-                if Toggles.Esp_Distance.Value then
-                    objects.Distance.Visible = true
-                    objects.Distance.Position = Vector2.new(x + w/2, y + h + 2)
-                    objects.Distance.Text = math.floor(dist) .. "m"
-                    objects.Distance.Color = Options.DistanceColor.Value
-                else
-                    objects.Distance.Visible = false
-                end
+            -- Name & Distance
+            if Toggles.Esp_Name.Value then
+                objects.Name.Visible = true
+                objects.Name.Position = Vector2.new(minX + (boxWidth/2), minY - 20)
+                objects.Name.Text = player.Name
+                objects.Name.Color = Options.NameColor.Value
+            else
+                objects.Name.Visible = false
+            end
 
-                if Toggles.Esp_HealthBar.Value then
-                    local hpPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
-                    local barHeight = h * hpPercent
-                    objects.HealthBar.Visible = true
-                    objects.HealthBar.From = Vector2.new(x - 5, y + h)
-                    objects.HealthBar.To = Vector2.new(x - 5, y + h - barHeight)
-                    objects.HealthBar.Color = Options.HealthBarColor.Value
-                else
-                    objects.HealthBar.Visible = false
-                end
+            if Toggles.Esp_Distance.Value then
+                objects.Distance.Visible = true
+                objects.Distance.Position = Vector2.new(minX + (boxWidth/2), maxY + 5)
+                objects.Distance.Text = math.floor(dist) .. "m"
+                objects.Distance.Color = Options.DistanceColor.Value
+            else
+                objects.Distance.Visible = false
+            end
 
-                if Toggles.Esp_Tracers.Value then
-                    local originY = (Options.Tracer_Origin.Value == "Top" and 0) or (Options.Tracer_Origin.Value == "Center" and viewportSize.Y / 2) or viewportSize.Y
-                    objects.Tracer.Visible = true
-                    objects.Tracer.From = Vector2.new(viewportSize.X / 2, originY)
-                    objects.Tracer.To = Vector2.new(x + w/2, y + h/2)
-                    objects.Tracer.Color = Options.TracerColor.Value
-                else
-                    objects.Tracer.Visible = false
-                end
+            -- Tracers
+            if Toggles.Esp_Tracers.Value then
+                local originY = (Options.Tracer_Origin.Value == "Top" and 0) or (Options.Tracer_Origin.Value == "Center" and viewportSize.Y / 2) or viewportSize.Y
+                objects.Tracer.Visible = true
+                objects.Tracer.From = Vector2.new(viewportSize.X / 2, originY)
+                objects.Tracer.To = Vector2.new(minX + (boxWidth/2), maxY)
+                objects.Tracer.Color = Options.TracerColor.Value
+            else
+                objects.Tracer.Visible = false
+            end
 
-                if Toggles.Esp_Skeleton.Value then
-                    for i, link in ipairs(skeletonLinks) do
-                        local p1 = char:FindFirstChild(link[1])
-                        local p2 = char:FindFirstChild(link[2])
-                        local line = skeletonLines[i]
+            -- Skeleton
+            if Toggles.Esp_Skeleton.Value then
+                for i, link in ipairs(skeletonLinks) do
+                    local p1 = char:FindFirstChild(link[1])
+                    local p2 = char:FindFirstChild(link[2])
+                    local line = skeletonLines[i]
+                    
+                    if p1 and p2 then
+                        local pos1, vis1 = Camera:WorldToViewportPoint(p1.Position)
+                        local pos2, vis2 = Camera:WorldToViewportPoint(p2.Position)
                         
-                        if p1 and p2 then
-                            local pos1, vis1 = Camera:WorldToViewportPoint(p1.Position)
-                            local pos2, vis2 = Camera:WorldToViewportPoint(p2.Position)
-                            
-                            if vis1 and vis2 then
-                                line.Visible = true
-                                line.From = Vector2.new(pos1.X, pos1.Y)
-                                line.To = Vector2.new(pos2.X, pos2.Y)
-                                line.Color = Options.SkeletonColor.Value
-                            else
-                                line.Visible = false
-                            end
+                        if vis1 and vis2 then
+                            line.Visible = true
+                            line.From = Vector2.new(pos1.X, pos1.Y)
+                            line.To = Vector2.new(pos2.X, pos2.Y)
+                            line.Color = Options.SkeletonColor.Value
                         else
                             line.Visible = false
                         end
+                    else
+                        line.Visible = false
                     end
-                else
-                    for _, line in pairs(skeletonLines) do line.Visible = false end
                 end
-
             else
-                HideAll()
-                if objects.OOF.Visible then objects.OOF.Visible = true end -- Keep OOF if active
+                for _, line in pairs(skeletonLines) do line.Visible = false end
             end
 
             -- Chams
-            if Toggles.Chams_Enabled and Toggles.Chams_Enabled.Value then
+            if Toggles.Chams_Enabled.Value then
                 if highlight.Parent ~= CoreGui then highlight.Parent = CoreGui end
                 highlight.Adornee = char
                 highlight.Enabled = true
                 highlight.FillColor = Options.ChamsFillColor.Value
-                highlight.FillTransparency = Toggles.Chams_Fill.Value and Options.ChamsFillColor.Transparency or 1
+                highlight.FillTransparency = Options.ChamsFillColor.Transparency
                 highlight.OutlineColor = Options.ChamsOutlineColor.Value
-                highlight.OutlineTransparency = Toggles.Chams_Outline.Value and Options.ChamsOutlineColor.Transparency or 1
+                highlight.OutlineTransparency = Options.ChamsOutlineColor.Transparency
                 highlight.DepthMode = Toggles.Chams_Occluded.Value and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
             else
                 highlight.Enabled = false
@@ -431,26 +429,21 @@ function UI:SetupMovement()
     FlyGroup:AddDropdown("Fly_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
     FlyGroup:AddSlider("Fly_Speed", { Text = "Speed", Default = 50, Min = 10, Max = 200, Rounding = 1 })
 
-    local PhaseGroup = MoveTab:AddLeftGroupbox("Phase")
-    PhaseGroup:AddToggle("Phase_Enabled", { Text = "Phase (Noclip)" }):AddKeyPicker("PhaseKey", { Default = "None", Text = "Phase", Mode = "Toggle" })
+    local PhaseGroup = MoveTab:AddRightGroupbox("Phase (Noclip)")
+    PhaseGroup:AddToggle("Phase_Enabled", { Text = "Enabled" }):AddKeyPicker("PhaseKey", { Default = "None", Text = "Phase", Mode = "Toggle" })
+    PhaseGroup:AddLabel("Walk through walls")
 
     local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
     HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" }):AddKeyPicker("HoverKey", { Default = "None", Text = "Hover", Mode = "Toggle" })
-    HoverGroup:AddToggle("Hover_Visuals", { Text = "Show Visuals (3D Ring)" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
+    HoverGroup:AddToggle("Hover_Visuals", { Text = "Ring" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
     HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = -50, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius (Distance)", Default = 20, Min = 5, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 30, Min = 1, Max = 120, Rounding = 0, Suffix = " RPM" })
+    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius", Default = 20, Min = 5, Max = 50, Rounding = 1 })
+    HoverGroup:AddSlider("Hover_Speed", { Text = "RPM", Default = 30, Min = 1, Max = 120, Rounding = 0 })
 
-    -- 3D Circle Cache
-    local HoverRingCache = {}
-    for i = 1, 32 do
-        table.insert(HoverRingCache, DrawingHandler:Line({Thickness = 1, Visible = false}))
-    end
-
-    -- Phase Loop
+    -- Phase Logic (Stepped for Physics)
     RunService.Stepped:Connect(function()
         if Toggles.Phase_Enabled.Value and LocalPlayer.Character then
-            for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            for _, part in pairs(LocalPlayer.Character:GetChildren()) do
                 if part:IsA("BasePart") and part.CanCollide then
                     part.CanCollide = false
                 end
@@ -458,6 +451,7 @@ function UI:SetupMovement()
         end
     end)
 
+    -- Movement Loop
     RunService.Heartbeat:Connect(function(dt)
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -465,6 +459,7 @@ function UI:SetupMovement()
         
         if not char or not hrp or not hum then return end
 
+        -- SPEED
         if Toggles.Speed_Enabled.Value then
             local moveDir = hum.MoveDirection
             if Options.Speed_Mode.Value == "Velocity" then
@@ -478,6 +473,7 @@ function UI:SetupMovement()
             end
         end
 
+        -- FLY
         if Toggles.Fly_Enabled.Value then
             local camCF = Camera.CFrame
             local speed = Options.Fly_Speed.Value
@@ -501,8 +497,10 @@ function UI:SetupMovement()
                 local bv = hrp:FindFirstChild("ArcaneFlyVelocity")
                 if bv then bv:Destroy() end
                 
-                -- Standard CFrame Fly Logic
-                hrp.Anchored = true
+                -- Crucial fix for CFrame fly: kill physics velocity
+                hrp.Velocity = Vector3.zero
+                hrp.RotVelocity = Vector3.zero
+                
                 if velocity.Magnitude > 0 then
                     hrp.CFrame = hrp.CFrame + (velocity * (speed * dt))
                 end
@@ -510,78 +508,6 @@ function UI:SetupMovement()
         else
             local bv = hrp and hrp:FindFirstChild("ArcaneFlyVelocity")
             if bv then bv:Destroy() end
-            if Options.Fly_Mode.Value == "CFrame" and hrp then
-                 hrp.Anchored = false
-            end
-        end
-
-        if Toggles.Hover_Enabled.Value then
-            local target = nil
-            local minDist = math.huge
-            
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer and not IsSameTeam(p) then
-                    local pch = p.Character
-                    local phrp = pch and pch:FindFirstChild("HumanoidRootPart")
-                    local phum = pch and pch:FindFirstChild("Humanoid")
-                    
-                    if phrp and phum and phum.Health > 0 then
-                        local d = (hrp.Position - phrp.Position).Magnitude
-                        if d < minDist then
-                            minDist = d
-                            target = phrp
-                        end
-                    end
-                end
-            end
-
-            if target then
-                local rpm = Options.Hover_Speed.Value
-                local theta = tick() * (rpm / 60) * (math.pi * 2) 
-                local radius = Options.Hover_Radius.Value
-                local height = Options.Hover_Offset.Value
-                
-                local offsetX = math.cos(theta) * radius
-                local offsetZ = math.sin(theta) * radius
-                local targetPos = target.Position + Vector3.new(offsetX, height, offsetZ)
-                
-                hrp.CFrame = CFrame.lookAt(targetPos, target.Position)
-                hrp.Velocity = Vector3.zero 
-                hrp.RotVelocity = Vector3.zero
-
-                if Toggles.Hover_Visuals.Value then
-                    local center = target.Position
-                    local segments = #HoverRingCache
-                    
-                    for i = 1, segments do
-                        local line = HoverRingCache[i]
-                        local a1 = (i / segments) * (math.pi * 2)
-                        local a2 = ((i + 1) / segments) * (math.pi * 2)
-                        
-                        local h = height
-                        local p1 = center + Vector3.new(math.cos(a1)*radius, h, math.sin(a1)*radius)
-                        local p2 = center + Vector3.new(math.cos(a2)*radius, h, math.sin(a2)*radius)
-                        
-                        local v1, vis1 = Camera:WorldToViewportPoint(p1)
-                        local v2, vis2 = Camera:WorldToViewportPoint(p2)
-                        
-                        if vis1 and vis2 then
-                            line.Visible = true
-                            line.From = Vector2.new(v1.X, v1.Y)
-                            line.To = Vector2.new(v2.X, v2.Y)
-                            line.Color = Options.Hover_RingColor.Value
-                        else
-                            line.Visible = false
-                        end
-                    end
-                else
-                    for _, line in ipairs(HoverRingCache) do line.Visible = false end
-                end
-            else
-                for _, line in ipairs(HoverRingCache) do line.Visible = false end
-            end
-        else
-            for _, line in ipairs(HoverRingCache) do line.Visible = false end
         end
     end)
 end
