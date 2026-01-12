@@ -1,11 +1,4 @@
-local success, result = pcall(function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/cueshut/saves/main/octohook%20ui%20lib"))()
-end)
-
-if success then
-    --ok
-else
-    --[[
+--[[
 
     Library Made for https://octohook.xyz/
     Developed by liam#4567
@@ -4882,4 +4875,3 @@ end
 
 getgenv().library = library
 return library
-end
