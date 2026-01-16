@@ -1,30 +1,32 @@
 local DrawingAPI = {}
 DrawingAPI.__index = DrawingAPI
 
-local NewDrawing = Drawing and Drawing.new or function() return nil end
-local Insert = table.insert
+local NewDrawing = Drawing and Drawing.new
+local TableClear = table.clear
+
+type DrawingObject = { [string]: any, Remove: (any) -> () }
 
 function DrawingAPI.new()
-    local self = setmetatable({}, DrawingAPI)
-    self.Cache = {}
-    return self
+	return setmetatable({
+		Cache = {}
+	}, DrawingAPI)
 end
 
-function DrawingAPI:_Create(type, properties)
-    local obj = NewDrawing(type)
-    
-    if not obj then return nil end
+function DrawingAPI:_Create(className: string, properties: {[string]: any}?)
+	if not NewDrawing then return nil end
+	
+	local obj = NewDrawing(className)
+	if not obj then return nil end
 
-    if properties then
-        for prop, val in pairs(properties) do
-            pcall(function()
-                obj[prop] = val
-            end)
-        end
-    end
-    
-    Insert(self.Cache, obj)
-    return obj
+	if properties then
+		for prop, val in properties do
+			obj[prop] = val
+		end
+	end
+	
+	local cache = self.Cache
+	cache[#cache + 1] = obj
+	return obj
 end
 
 function DrawingAPI:Line(p) return self:_Create("Line", p) end
@@ -35,13 +37,14 @@ function DrawingAPI:Triangle(p) return self:_Create("Triangle", p) end
 function DrawingAPI:Quad(p) return self:_Create("Quad", p) end
 
 function DrawingAPI:RemoveAll()
-    for i = #self.Cache, 1, -1 do
-        local obj = self.Cache[i]
-        if obj then
-            pcall(function() obj:Remove() end)
-        end
-        self.Cache[i] = nil
-    end
+	local cache = self.Cache
+	for i = 1, #cache do
+		local obj = cache[i]
+		if obj then
+			obj:Remove()
+		end
+	end
+	TableClear(cache)
 end
 
 return DrawingAPI
