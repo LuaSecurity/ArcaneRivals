@@ -757,5 +757,3 @@ function Arcane:CreateWindow(Title)
 
     return Window
 end
-
-return Arcane
