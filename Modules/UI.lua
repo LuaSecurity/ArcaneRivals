@@ -1,444 +1,761 @@
-local UI = {}
-UI.__index = UI
-
--- Pre-fetch Services and Functions
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local CoreGui = game:GetService("CoreGui")
 local UserInputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local Camera = workspace.CurrentCamera
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local Workspace = game:GetService("Workspace")
+local HttpService = game:GetService("HttpService")
+local CoreGui = game:GetService("CoreGui")
 
--- Localize Math and Methods
-local _v2 = Vector2.new
-local _v3 = Vector3.new
-local _cfLookAt = CFrame.lookAt
-local _mathAtan2 = math.atan2
-local _mathCos = math.cos
-local _mathSin = math.sin
-local _mathFloor = math.floor
-local _mathAbs = math.abs
-local _mathClamp = math.clamp
+local Arcane = {
+    Registry = {},
+    MenuRegistry = {},
+    Notifications = {},
+    Config = {
+        WindowSize = Vector2.new(450, 500),
+        MainColor = Color3.fromRGB(15, 15, 15),
+        FrameColor = Color3.fromRGB(20, 20, 20),
+        OutlineColor = Color3.fromRGB(40, 40, 40),
+        InlineColor = Color3.fromRGB(5, 5, 5),
+        AccentColor = Color3.fromRGB(120, 84, 147),
+        SelectedColor = Color3.fromRGB(180, 150, 255),
+        SecondaryColor = Color3.fromRGB(160, 160, 160),
+        Font = 2,
+        TextSize = 13
+    },
+    Settings = {}, 
+    Folder = "Arcane_Configs"
+}
 
-local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
-
-local DrawingAPIClass = loadstring(game:HttpGet("https://raw.githubusercontent.com/LuaSecurity/ArcaneRivals/refs/heads/main/Modules/Drawing.lua"))()
-local DrawingHandler = DrawingAPIClass.new()
-
-function UI.new(title)
-    local self = setmetatable({}, UI)
-    
-    self.Window = Library:CreateWindow({
-        Title = title or "Arcane",
-        Center = true,
-        AutoShow = true,
-        TabPadding = 8,
-        MenuFadeTime = 0.2
-    })
-
-    self.Tabs = {}
-    self.ESP_Cache = {}
-    
-    ThemeManager:SetLibrary(Library)
-    SaveManager:SetLibrary(Library)
-    SaveManager:IgnoreThemeSettings()
-    
-    return self
+if not isfolder(Arcane.Folder) then 
+    makefolder(Arcane.Folder) 
 end
 
-function UI:CreateTab(name)
-    if self.Tabs[name] then return self.Tabs[name] end
-    local tab = self.Window:AddTab(name)
-    self.Tabs[name] = tab
-    return tab
+local function lerp(a, b, t)
+    return a + (b - a) * t
 end
 
-local function IsSameTeam(player)
-    if not (player and LocalPlayer) then return false end
-    local myTeam = LocalPlayer:GetAttribute("TeamID")
-    local theirTeam = player:GetAttribute("TeamID")
-    return myTeam ~= nil and theirTeam ~= nil and myTeam == theirTeam
+local function Create(Type, Properties, IsMenu)
+    local Obj = Drawing.new(Type)
+    for K, V in next, Properties do
+        Obj[K] = V
+    end
+    table.insert(IsMenu and Arcane.MenuRegistry or Arcane.Registry, Obj)
+    return Obj
 end
 
-function UI:SetupVisuals()
-    local VisualsTab = self:CreateTab("Visuals")
-    
-    local EspGroup = VisualsTab:AddLeftGroupbox("ESP Main")
-    EspGroup:AddToggle("Esp_Enabled", { Text = "Enabled", Default = false })
-    EspGroup:AddToggle("Esp_TeamCheck", { Text = "Team Check", Default = true })
-    EspGroup:AddToggle("Esp_DistLimitEnabled", { Text = "Use Distance Limit", Default = false })
-    EspGroup:AddSlider("Esp_MaxDist", { Text = "Max Distance", Default = 500, Min = 100, Max = 5000, Rounding = 0 })
-    EspGroup:AddDivider()
-    EspGroup:AddToggle("Esp_Box", { Text = "Box" }):AddColorPicker("BoxColor", { Default = Color3.new(1,1,1) })
-    EspGroup:AddToggle("Esp_BoxFill", { Text = "Box Fill" }):AddColorPicker("BoxFillColor", { Default = Color3.new(1, 0, 0), Transparency = 0.5 })
-    EspGroup:AddToggle("Esp_Name", { Text = "Name" }):AddColorPicker("NameColor", { Default = Color3.new(1,1,1) })
-    EspGroup:AddToggle("Esp_Distance", { Text = "Distance" }):AddColorPicker("DistanceColor", { Default = Color3.new(1,1,1) })
-    EspGroup:AddToggle("Esp_HealthBar", { Text = "Health Bar" })
-    EspGroup:AddToggle("Esp_Skeleton", { Text = "Skeleton" }):AddColorPicker("SkeletonColor", { Default = Color3.new(1,1,1) })
-    
-    local ChamsGroup = VisualsTab:AddLeftGroupbox("Chams")
-    ChamsGroup:AddToggle("Chams_Enabled", { Text = "Enabled" })
-    ChamsGroup:AddToggle("Chams_Fill", { Text = "Fill" }):AddColorPicker("ChamsFillColor", { Default = Color3.fromRGB(150, 0, 0), Transparency = 0.5 })
-    ChamsGroup:AddToggle("Chams_Outline", { Text = "Outline" }):AddColorPicker("ChamsOutlineColor", { Default = Color3.fromRGB(255, 0, 0), Transparency = 0 })
-    ChamsGroup:AddToggle("Chams_Occluded", { Text = "Visible Check", Default = true })
+function Arcane:ClearMenu()
+    for i = #self.MenuRegistry, 1, -1 do
+        if self.MenuRegistry[i] then
+            self.MenuRegistry[i]:Remove()
+            self.MenuRegistry[i] = nil
+        end
+    end
+end
 
-    local TracerGroup = VisualsTab:AddRightGroupbox("Bullet Effects")
-    TracerGroup:AddToggle("CustomTracers", { Text = "Bullet Tracers" })
-    TracerGroup:AddLabel("Tracer Color"):AddColorPicker("Tracer_Color", { Default = Color3.fromRGB(255, 255, 255) })
-    TracerGroup:AddSlider("Tracer_Thickness", { Text = "Thickness", Default = 0.03, Min = 0.01, Max = 0.5, Rounding = 3 })
-    TracerGroup:AddSlider("Tracer_Duration", { Text = "Lifetime (s)", Default = 1.5, Min = 0.1, Max = 5, Rounding = 1 })
-
-    local MiscVisuals = VisualsTab:AddRightGroupbox("Visuals Extras")
-    MiscVisuals:AddToggle("Esp_Tracers", { Text = "Tracers" }):AddColorPicker("TracerColor", { Default = Color3.new(1,1,1) })
-    MiscVisuals:AddDropdown("Tracer_Origin", { Text = "Line Origin", Default = "Bottom", Values = {"Top", "Center", "Bottom"} })
-    MiscVisuals:AddDivider()
-    MiscVisuals:AddToggle("Esp_OOF", { Text = "Off-Screen Indicators" }):AddColorPicker("OOFColor", { Default = Color3.new(1,1,1) })
-    MiscVisuals:AddSlider("OOF_Radius", { Text = "OOF Radius", Default = 200, Min = 50, Max = 600, Rounding = 0 })
-    MiscVisuals:AddSlider("OOF_Size", { Text = "OOF Arrow Size", Default = 15, Min = 5, Max = 50, Rounding = 0 })
-
-    local skeletonLinks = {
-        {"Head", "UpperTorso"}, {"UpperTorso", "LowerTorso"},
-        {"LowerTorso", "LeftUpperLeg"}, {"LeftUpperLeg", "LeftLowerLeg"}, {"LeftLowerLeg", "LeftFoot"},
-        {"LowerTorso", "RightUpperLeg"}, {"RightUpperLeg", "RightLowerLeg"}, {"RightLowerLeg", "RightFoot"},
-        {"UpperTorso", "LeftUpperArm"}, {"LeftUpperArm", "LeftLowerArm"}, {"LeftLowerArm", "LeftHand"},
-        {"UpperTorso", "RightUpperArm"}, {"RightUpperArm", "RightLowerArm"}, {"RightHand", "RightLowerArm"}
+function Arcane:Log(Text, Cooldown)
+    local Duration = Cooldown or 3
+    local Log = {
+        Active = true,
+        Alpha = 0,
+        TargetAlpha = 1,
+        Pos = Vector2.new(-350, -60), 
+        TargetPos = Vector2.new(25, 25),
+        Text = Text,
+        Timer = Duration,
+        MaxTimer = Duration
     }
 
-    local function RemovePlayerESP(player)
-        local data = self.ESP_Cache[player]
-        if data then
-            for _, obj in data.Drawings do if obj.Remove then obj:Remove() end end
-            for _, line in data.Skeleton do if line.Remove then line:Remove() end end
-            if data.Highlight then data.Highlight:Destroy() end
-            self.ESP_Cache[player] = nil
+    local Out = Create("Square", {Thickness = 1, Color = self.Config.OutlineColor, Filled = false, ZIndex = 100, Visible = true})
+    local Main = Create("Square", {Color = self.Config.MainColor, Filled = true, ZIndex = 99, Visible = true})
+    local Accent = Create("Square", {Color = self.Config.AccentColor, Filled = true, ZIndex = 101, Visible = true})
+    local Txt = Create("Text", {Text = Text, Size = 14, Font = 2, Color = Color3.fromRGB(230, 230, 230), ZIndex = 102, Visible = true})
+    
+    local CometSegments = {}
+    local SegmentCount = 12
+    for i = 1, SegmentCount do
+        table.insert(CometSegments, Create("Square", {
+            Color = self.Config.AccentColor, 
+            Filled = true, 
+            ZIndex = 103, 
+            Visible = true,
+            Transparency = (i / SegmentCount)
+        }))
+    end
+
+    task.spawn(function()
+        while Log.Active do
+            local Delta = RunService.RenderStepped:Wait()
+            
+            Log.Alpha = lerp(Log.Alpha, Log.TargetAlpha, 0.035)
+            
+            local YOffset = 25
+            for i, v in next, Arcane.Notifications do
+                if v == Log then break end
+                YOffset = YOffset + 42 
+            end
+            
+            if Log.TargetAlpha == 0 then
+                Log.TargetPos = Vector2.new(-350, -60)
+            else
+                Log.TargetPos = Vector2.new(25, YOffset)
+            end
+            
+            Log.Pos = Log.Pos:Lerp(Log.TargetPos, 0.045)
+
+            local Width = Txt.TextBounds.X + 45
+            local Size = Vector2.new(Width, 34)
+            
+            Main.Size = Size
+            Main.Position = Log.Pos
+            Main.Transparency = Log.Alpha
+            
+            Out.Size = Size
+            Out.Position = Log.Pos
+            Out.Transparency = Log.Alpha
+
+            Accent.Size = Vector2.new(2.5, Size.Y)
+            Accent.Position = Log.Pos
+            Accent.Transparency = Log.Alpha
+
+            Txt.Position = Log.Pos + Vector2.new(15, 10)
+            Txt.Transparency = Log.Alpha
+
+            local Progress = math.clamp(1 - (Log.Timer / Log.MaxTimer), 0, 1)
+            local BarTravelWidth = Width * Progress
+            local SegmentWidth = 3
+            
+            for i, Seg in next, CometSegments do
+                Seg.Size = Vector2.new(SegmentWidth, 2)
+                Seg.Position = Log.Pos + Vector2.new(BarTravelWidth - (SegmentWidth * (SegmentCount - i)), Size.Y - 2)
+                
+                if Seg.Position.X < Log.Pos.X then
+                    Seg.Visible = false
+                else
+                    Seg.Visible = true
+                    Seg.Transparency = (i / SegmentCount) * Log.Alpha
+                end
+            end
+
+            if Log.TargetAlpha == 1 then
+                Log.Timer = Log.Timer - Delta
+                if Log.Timer <= 0 then Log.TargetAlpha = 0 end
+            elseif Log.Alpha < 0.01 then
+                Log.Active = false
+            end
+        end
+        
+        Main:Remove(); Out:Remove(); Accent:Remove(); Txt:Remove()
+        for _, Seg in next, CometSegments do Seg:Remove() end
+        for i, v in next, Arcane.Notifications do
+            if v == Log then table.remove(Arcane.Notifications, i) break end
+        end
+    end)
+    table.insert(Arcane.Notifications, Log)
+end
+
+function Arcane:CreateWindow(Title)
+    local Viewport = workspace.CurrentCamera.ViewportSize
+    local Pos = (Viewport / 2) - (self.Config.WindowSize / 2)
+    
+    local Window = {
+        BasePos = Pos,
+        Size = self.Config.WindowSize,
+        Tabs = {},
+        Visible = true,
+        ToggleKey = Enum.KeyCode.RightControl,
+        IsBinding = false,
+        TabAlignment = "TopRight",
+        SelectedTab = nil,
+        Dragging = false,
+        DragStart = nil,
+        StartPos = nil,
+        ScrollOffset = 0,
+        Elements = {},
+        ContextMenu = {
+            Open = false,
+            Pos = Vector2.new(0,0),
+            Size = Vector2.new(0,0),
+            TargetSize = Vector2.new(0,0),
+            Alpha = 0
+        },
+        AnimData = {
+            TabPositions = {},
+            LerpSpeed = 0.15,
+            ContentRelativePos = Vector2.new(10, 55),
+            NavLineRelativePos = Vector2.new(10, 26)
+        },
+        ActiveTextbox = nil
+    }
+
+    Window.Elements.Out1 = Create("Square", {Position = Pos - Vector2.new(1, 1), Size = Window.Size + Vector2.new(2, 2), Color = self.Config.InlineColor, Filled = false, Thickness = 1, Visible = true, ZIndex = 1})
+    Window.Elements.Out2 = Create("Square", {Position = Pos, Size = Window.Size, Color = self.Config.OutlineColor, Filled = false, Thickness = 1, Visible = true, ZIndex = 2})
+    Window.Elements.Main = Create("Square", {Position = Pos + Vector2.new(1, 1), Size = Window.Size - Vector2.new(2, 2), Color = self.Config.MainColor, Filled = true, Visible = true, ZIndex = 3})
+    Window.Elements.HeaderT = Create("Text", {Text = Title, Color = self.Config.AccentColor, Size = self.Config.TextSize, Font = self.Config.Font, Visible = true, ZIndex = 4})
+    Window.Elements.HeaderWtf = Create("Text", {Text = ".wtf", Color = Color3.fromRGB(255, 255, 255), Size = self.Config.TextSize, Font = self.Config.Font, Visible = true, ZIndex = 4})
+    Window.Elements.NavLine = Create("Square", {Size = Vector2.new(Window.Size.X - 20, 1), Color = self.Config.OutlineColor, Filled = true, Visible = true, ZIndex = 4})
+    Window.Elements.ContentFrame = Create("Square", {Size = Window.Size - Vector2.new(20, 65), Color = self.Config.FrameColor, Filled = true, Visible = true, ZIndex = 4})
+    Window.Elements.ContentOutline = Create("Square", {Size = Window.Elements.ContentFrame.Size + Vector2.new(2, 2), Color = self.Config.OutlineColor, Filled = false, Thickness = 1, Visible = true, ZIndex = 5})
+    
+    local InputBlocker = Instance.new("ContextActionService")
+
+    function Window:UpdateLayout()
+        if not self.Visible then return end
+        
+        local ViewportSize = workspace.CurrentCamera.ViewportSize
+        local MaxX, MaxY = ViewportSize.X - self.Size.X, ViewportSize.Y - self.Size.Y
+        self.BasePos = Vector2.new(math.clamp(self.BasePos.X, 0, MaxX), math.clamp(self.BasePos.Y, 0, MaxY))
+
+        local IsBottom = (self.TabAlignment == "BottomRight" or self.TabAlignment == "BottomLeft")
+        local IsLeft = (self.TabAlignment == "TopLeft" or self.TabAlignment == "BottomLeft")
+        
+        self.Elements.Out1.Position = self.BasePos - Vector2.new(1, 1)
+        self.Elements.Out2.Position = self.BasePos
+        self.Elements.Main.Position = self.BasePos + Vector2.new(1, 1)
+        self.Elements.HeaderT.Position = self.BasePos + Vector2.new(8, 6)
+        self.Elements.HeaderWtf.Position = self.BasePos + Vector2.new(8 + self.Elements.HeaderT.TextBounds.X, 6)
+
+        local TargetFrameY = IsBottom and 30 or 55
+        local TargetNavY = IsBottom and (self.Size.Y - 26) or 26
+        
+        local TargetContentRel = Vector2.new(10, TargetFrameY)
+        local TargetNavLineRel = Vector2.new(10, TargetNavY)
+
+        self.AnimData.ContentRelativePos = self.AnimData.ContentRelativePos:Lerp(TargetContentRel, self.AnimData.LerpSpeed)
+        self.AnimData.NavLineRelativePos = self.AnimData.NavLineRelativePos:Lerp(TargetNavLineRel, self.AnimData.LerpSpeed)
+
+        self.Elements.ContentFrame.Position = self.BasePos + self.AnimData.ContentRelativePos
+        self.Elements.ContentOutline.Position = self.Elements.ContentFrame.Position - Vector2.new(1, 1)
+        self.Elements.NavLine.Position = self.BasePos + self.AnimData.NavLineRelativePos
+        
+        self.NavArea = {Pos = self.Elements.NavLine.Position - Vector2.new(0, 2), Size = Vector2.new(self.Size.X - 20, 24)}
+
+        local CurrentOffset = 15
+        local TargetTabY = IsBottom and (self.Size.Y - 22) or 32
+        
+        for i, Tab in next, self.Tabs do
+            local Width = Tab.Instance.TextBounds.X
+            local TabX = IsLeft and CurrentOffset or (self.Size.X - CurrentOffset - Width)
+            local TargetTabRel = Vector2.new(TabX, TargetTabY)
+            
+            if not self.AnimData.TabPositions[Tab] then self.AnimData.TabPositions[Tab] = TargetTabRel end
+            self.AnimData.TabPositions[Tab] = self.AnimData.TabPositions[Tab]:Lerp(TargetTabRel, self.AnimData.LerpSpeed)
+            Tab.Instance.Position = self.BasePos + self.AnimData.TabPositions[Tab]
+            
+            CurrentOffset = CurrentOffset + Width + 15
+            
+            local LeftY, RightY = 15 - self.ScrollOffset, 15 - self.ScrollOffset
+            local IsActive = (self.SelectedTab == Tab)
+            
+            for j, Section in next, Tab.Sections do
+                local IsLeftCol = (j % 2 ~= 0)
+                local TargetSecX = IsLeftCol and 10 or (self.Elements.ContentFrame.Size.X / 2 + 5)
+                local TargetSecY = IsLeftCol and LeftY or RightY
+                local FinalPos = self.Elements.ContentFrame.Position + Vector2.new(TargetSecX, TargetSecY)
+                
+                local SectionHeight = 20
+                for _, Elm in next, Section.Elements do
+                    SectionHeight = SectionHeight + Elm.Height
+                end
+                Section.Main.Size = Vector2.new(Window.Elements.ContentFrame.Size.X / 2 - 15, SectionHeight)
+                Section.Outline.Size = Section.Main.Size
+
+                local InBounds = (FinalPos.Y >= self.Elements.ContentFrame.Position.Y) and (FinalPos.Y + Section.Main.Size.Y <= self.Elements.ContentFrame.Position.Y + self.Elements.ContentFrame.Size.Y)
+
+                Section.Main.Visible = IsActive and self.Visible and InBounds
+                Section.Outline.Visible = IsActive and self.Visible and InBounds
+                Section.Title.Visible = IsActive and self.Visible and InBounds
+                Section.Main.Position = FinalPos
+                Section.Outline.Position = FinalPos
+                Section.Title.Position = FinalPos + Vector2.new(10, -7)
+
+                local ElementY = 10
+                for _, Element in next, Section.Elements do
+                    Element.Update(FinalPos + Vector2.new(10, ElementY), IsActive and self.Visible and InBounds)
+                    ElementY = ElementY + Element.Height
+                end
+
+                if IsLeftCol then LeftY = LeftY + Section.Main.Size.Y + 15 else RightY = RightY + Section.Main.Size.Y + 15 end
+            end
         end
     end
 
-    local function CreatePlayerESP(player)
-        if player == LocalPlayer then return end
-        RemovePlayerESP(player)
+    function Window:CreateTab(Name)
+        local Tab = {Name = Name, Sections = {}, Instance = Create("Text", {Text = Name, Size = Arcane.Config.TextSize, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, Visible = true, ZIndex = 5})}
+        
+        function Tab:CreateSection(SName)
+            local Section = {
+                Elements = {},
+                Main = Create("Square", {Size = Vector2.new(Window.Elements.ContentFrame.Size.X / 2 - 15, 10), Color = Arcane.Config.MainColor, Filled = true, Visible = false, ZIndex = 6}),
+                Outline = Create("Square", {Size = Vector2.new(Window.Elements.ContentFrame.Size.X / 2 - 15, 10), Color = Arcane.Config.OutlineColor, Filled = false, Thickness = 1, Visible = false, ZIndex = 7}),
+                Title = Create("Text", {Text = SName, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.AccentColor, Visible = false, ZIndex = 8})
+            }
 
-        local highlight = Instance.new("Highlight")
-        highlight.Name = "ArcaneChams"
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.Enabled = false
+            function Section:AddLabel(Text, Align) 
+                local Label = {Height = 15, Text = Text}
+                local L = Create("Text", {Text = Text, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                
+                function Label.Update(Base, Visible)
+                    local XOffset = 0
+                    if Align == "Center" then XOffset = (Section.Main.Size.X - L.TextBounds.X - 20)/2 
+                    elseif Align == "Right" then XOffset = (Section.Main.Size.X - L.TextBounds.X - 20) end
+                    L.Position = Base + Vector2.new(XOffset, 0)
+                    L.Visible = Visible
+                end
+                table.insert(Section.Elements, Label)
+            end
 
-        local drawings = {
-            BoxFilled = DrawingHandler:Square({ Thickness = 1, Filled = true, Visible = false }),
-            Box = DrawingHandler:Square({ Thickness = 1, Visible = false }),
-            BoxOutline = DrawingHandler:Square({ Thickness = 3, Color = Color3.new(0,0,0), Visible = false }),
-            Name = DrawingHandler:Text({ Size = 14, Center = true, Outline = true, Visible = false }),
-            Distance = DrawingHandler:Text({ Size = 13, Center = true, Outline = true, Visible = false }),
-            HealthBg = DrawingHandler:Line({ Thickness = 2.3, Color = Color3.new(0,0,0), Visible = false }),
-            HealthBar = DrawingHandler:Line({ Thickness = 2, Visible = false }),
-            Tracer = DrawingHandler:Line({ Thickness = 1, Visible = false }),
-            OOF = DrawingHandler:Triangle({ Thickness = 1, Filled = true, Visible = false })
-        }
+            function Section:AddToggle(TName, Default, Callback)
+                local Toggle = {Value = Default or false, Height = 20}
+                local Box = Create("Square", {Size = Vector2.new(10, 10), Color = Arcane.Config.OutlineColor, Filled = true, ZIndex = 9, Visible = false})
+                local Label = Create("Text", {Text = TName, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                
+                Arcane.Settings[TName] = Toggle.Value
 
-        local skeleton = {}
-        for i = 1, #skeletonLinks do
-            skeleton[i] = DrawingHandler:Line({ Thickness = 1, Visible = false, Color = Color3.new(1,1,1) })
+                function Toggle.Update(Base, Visible)
+                    Box.Position = Base + Vector2.new(0, 2)
+                    Label.Position = Base + Vector2.new(15, 0)
+                    Box.Visible, Label.Visible = Visible, Visible
+                    Box.Color = Toggle.Value and Arcane.Config.AccentColor or Arcane.Config.OutlineColor
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Box.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Box.Position.X and M.X <= Label.Position.X + Label.TextBounds.X and M.Y >= Box.Position.Y and M.Y <= Box.Position.Y + 12 then
+                            Toggle.Value = not Toggle.Value
+                            Arcane.Settings[TName] = Toggle.Value
+                            Callback(Toggle.Value)
+                        end
+                    end
+                end)
+                table.insert(Section.Elements, Toggle)
+                return Toggle
+            end
+
+            function Section:AddSlider(SName, Min, Max, Default, Callback)
+                local Slider = {Value = Default or Min, Height = 35, Dragging = false}
+                local Label = Create("Text", {Text = SName, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                local Bar = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 4), Color = Arcane.Config.FrameColor, Filled = true, ZIndex = 9, Visible = false})
+                local Fill = Create("Square", {Size = Vector2.new(0, 4), Color = Arcane.Config.AccentColor, Filled = true, ZIndex = 10, Visible = false})
+                local ValLabel = Create("Text", {Text = tostring(Slider.Value), Size = Arcane.Config.TextSize - 2, Font = Arcane.Config.Font, Color = Color3.fromRGB(255,255,255), ZIndex = 11, Visible = false})
+
+                Arcane.Settings[SName] = Slider.Value
+
+                function Slider.Update(Base, Visible)
+                    Label.Position = Base
+                    Bar.Position = Base + Vector2.new(0, 20)
+                    local Percent = math.clamp((Slider.Value - Min) / (Max - Min), 0, 1)
+                    Fill.Size = Vector2.new(Bar.Size.X * Percent, 4)
+                    Fill.Position = Bar.Position
+                    ValLabel.Text = tostring(math.floor(Slider.Value))
+                    ValLabel.Position = Bar.Position + Vector2.new(Bar.Size.X - ValLabel.TextBounds.X, -16)
+                    Label.Visible, Bar.Visible, Fill.Visible, ValLabel.Visible = Visible, Visible, Visible, Visible
+                    if Slider.Dragging then
+                        local M = UserInputService:GetMouseLocation()
+                        local NewP = math.clamp((M.X - Bar.Position.X) / Bar.Size.X, 0, 1)
+                        Slider.Value = Min + (Max - Min) * NewP
+                        Arcane.Settings[SName] = Slider.Value
+                        Callback(Slider.Value)
+                    end
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Bar.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Bar.Position.X and M.X <= Bar.Position.X + Bar.Size.X and M.Y >= Bar.Position.Y - 5 and M.Y <= Bar.Position.Y + 10 then
+                            Slider.Dragging = true
+                        end
+                    end
+                end)
+                UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Slider.Dragging = false end end)
+                table.insert(Section.Elements, Slider)
+            end
+
+            function Section:AddKeybind(Default, Callback, IsMenuBind)
+                local Keybind = {Value = Default, Height = 20, Binding = false, Callback = Callback, JustBound = false}
+                local Label = Create("Text", {Text = IsMenuBind and "Toggle Menu" or "Bind", Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                local BindTxt = Create("Text", {Text = "[ " .. (Keybind.Value and Keybind.Value.Name or "None") .. " ]", Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 12, Visible = false})
+
+                function Keybind.Update(Base, Visible)
+                    Label.Position = Base
+                    Label.Visible = Visible
+                    BindTxt.Visible = Visible
+                    BindTxt.Position = Base + Vector2.new(Section.Main.Size.X - BindTxt.TextBounds.X - 20, 0)
+                    BindTxt.Text = Keybind.Binding and "[ ... ]" or "[ " .. (Keybind.Value and Keybind.Value.Name or "None") .. " ]"
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if Keybind.Binding and input.UserInputType == Enum.UserInputType.Keyboard then
+                        Keybind.Value = input.KeyCode
+                        Keybind.Binding = false
+                        Keybind.JustBound = true
+                        task.delay(0.1, function() Keybind.JustBound = false end)
+                        Window.IsBinding = false
+                        if Keybind.Callback and not IsMenuBind then Keybind.Callback(Keybind.Value) end
+                        if IsMenuBind then Window.ToggleKey = Keybind.Value end
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton1 and BindTxt.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= BindTxt.Position.X and M.X <= BindTxt.Position.X + BindTxt.TextBounds.X and M.Y >= BindTxt.Position.Y and M.Y <= BindTxt.Position.Y + 15 then
+                            Keybind.Binding = true
+                            Window.IsBinding = true
+                        end
+                    elseif not Keybind.Binding and not Keybind.JustBound and input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == Keybind.Value then
+                        if Keybind.Callback and not Window.IsBinding then Keybind.Callback() end
+                    end
+                end)
+                table.insert(Section.Elements, Keybind)
+                return Keybind
+            end
+
+            function Section:AddDropdown(Name, Items, Callback)
+                local Dropdown = {Open = false, Height = 35, Selected = Items[1] or "None", Items = Items}
+                local Label = Create("Text", {Text = Name, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                local Box = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.FrameColor, Filled = true, ZIndex = 9, Visible = false})
+                local BoxOut = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.OutlineColor, Filled = false, ZIndex = 10, Visible = false})
+                local Current = Create("Text", {Text = Dropdown.Selected, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Color3.fromRGB(200,200,200), ZIndex = 11, Visible = false})
+                
+                local DropItems = {}
+                Arcane.Settings[Name] = Dropdown.Selected
+
+                function Dropdown:Refresh(NewItems)
+                    Dropdown.Items = NewItems
+                    for _, v in next, DropItems do v.Box:Remove(); v.Text:Remove() end
+                    table.clear(DropItems)
+                end
+
+                function Dropdown.Update(Base, Visible)
+                    Label.Position = Base
+                    Box.Position = Base + Vector2.new(0, 15)
+                    BoxOut.Position = Box.Position
+                    Current.Position = Box.Position + Vector2.new(5, 2)
+                    Label.Visible, Box.Visible, BoxOut.Visible, Current.Visible = Visible, Visible, Visible, Visible
+                    Current.Text = Dropdown.Selected .. (Dropdown.Open and " ^" or " v")
+                    
+                    if Dropdown.Open then
+                        Dropdown.Height = 35 + (#Dropdown.Items * 18)
+                        for i, v in next, Dropdown.Items do
+                            if not DropItems[i] then
+                                DropItems[i] = {
+                                    Box = Create("Square", {Filled = true, Color = Arcane.Config.FrameColor, ZIndex = 25}),
+                                    Text = Create("Text", {Text = v, Size = 13, Font = 2, Color = Color3.fromRGB(200,200,200), ZIndex = 26})
+                                }
+                            end
+                            local ItemBox = DropItems[i].Box
+                            local ItemText = DropItems[i].Text
+                            ItemBox.Visible, ItemText.Visible = Visible, Visible
+                            ItemBox.Size = Vector2.new(Box.Size.X, 18)
+                            ItemBox.Position = Box.Position + Vector2.new(0, 18 * i)
+                            ItemText.Position = ItemBox.Position + Vector2.new(5, 2)
+                            local M = UserInputService:GetMouseLocation()
+                            if M.X >= ItemBox.Position.X and M.X <= ItemBox.Position.X + ItemBox.Size.X and M.Y >= ItemBox.Position.Y and M.Y <= ItemBox.Position.Y + ItemBox.Size.Y then
+                                ItemText.Color = Arcane.Config.AccentColor
+                            else
+                                ItemText.Color = Color3.fromRGB(200,200,200)
+                            end
+                        end
+                    else
+                        Dropdown.Height = 35
+                        for _, v in next, DropItems do v.Box.Visible = false; v.Text.Visible = false end
+                    end
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Box.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Box.Position.X and M.X <= Box.Position.X + Box.Size.X and M.Y >= Box.Position.Y and M.Y <= Box.Position.Y + Box.Size.Y then
+                            Dropdown.Open = not Dropdown.Open
+                            Window:UpdateLayout()
+                            return
+                        end
+                        if Dropdown.Open then
+                            for i, v in next, Dropdown.Items do
+                                local ItemBox = DropItems[i].Box
+                                if M.X >= ItemBox.Position.X and M.X <= ItemBox.Position.X + ItemBox.Size.X and M.Y >= ItemBox.Position.Y and M.Y <= ItemBox.Position.Y + ItemBox.Size.Y then
+                                    Dropdown.Selected = v
+                                    Arcane.Settings[Name] = v
+                                    Dropdown.Open = false
+                                    Callback(v)
+                                    Window:UpdateLayout()
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end)
+                table.insert(Section.Elements, Dropdown)
+                return Dropdown
+            end
+
+            function Section:AddMultiDropdown(Name, Items, Callback)
+                local MultiDrop = {Open = false, Height = 35, Selected = {}}
+                local Label = Create("Text", {Text = Name, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                local Box = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.FrameColor, Filled = true, ZIndex = 9, Visible = false})
+                local BoxOut = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.OutlineColor, Filled = false, ZIndex = 10, Visible = false})
+                local Current = Create("Text", {Text = "...", Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Color3.fromRGB(200,200,200), ZIndex = 11, Visible = false})
+                
+                local DropItems = {}
+                Arcane.Settings[Name] = MultiDrop.Selected
+
+                function MultiDrop.Update(Base, Visible)
+                    Label.Position = Base
+                    Box.Position = Base + Vector2.new(0, 15)
+                    BoxOut.Position = Box.Position
+                    Current.Position = Box.Position + Vector2.new(5, 2)
+                    Label.Visible, Box.Visible, BoxOut.Visible, Current.Visible = Visible, Visible, Visible, Visible
+                    
+                    local Count = 0
+                    for _ in next, MultiDrop.Selected do Count = Count + 1 end
+                    Current.Text = (Count == 0 and "None" or tostring(Count).." Selected") .. (MultiDrop.Open and " ^" or " v")
+                    
+                    if MultiDrop.Open then
+                        MultiDrop.Height = 35 + (#Items * 18)
+                        for i, v in next, Items do
+                            if not DropItems[i] then
+                                DropItems[i] = {
+                                    Box = Create("Square", {Filled = true, Color = Arcane.Config.FrameColor, ZIndex = 25}),
+                                    Text = Create("Text", {Text = v, Size = 13, Font = 2, Color = Color3.fromRGB(200,200,200), ZIndex = 26})
+                                }
+                            end
+                            local ItemBox = DropItems[i].Box
+                            local ItemText = DropItems[i].Text
+                            ItemBox.Visible, ItemText.Visible = Visible, Visible
+                            ItemBox.Size = Vector2.new(Box.Size.X, 18)
+                            ItemBox.Position = Box.Position + Vector2.new(0, 18 * i)
+                            ItemText.Position = ItemBox.Position + Vector2.new(5, 2)
+                            local IsSelected = MultiDrop.Selected[v]
+                            ItemText.Color = IsSelected and Arcane.Config.SelectedColor or Color3.fromRGB(200,200,200)
+                        end
+                    else
+                        MultiDrop.Height = 35
+                        for _, v in next, DropItems do v.Box.Visible = false; v.Text.Visible = false end
+                    end
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Box.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Box.Position.X and M.X <= Box.Position.X + Box.Size.X and M.Y >= Box.Position.Y and M.Y <= Box.Position.Y + Box.Size.Y then
+                            MultiDrop.Open = not MultiDrop.Open
+                            Window:UpdateLayout()
+                            return
+                        end
+                        if MultiDrop.Open then
+                            for i, v in next, Items do
+                                local ItemBox = DropItems[i].Box
+                                if M.X >= ItemBox.Position.X and M.X <= ItemBox.Position.X + ItemBox.Size.X and M.Y >= ItemBox.Position.Y and M.Y <= ItemBox.Position.Y + ItemBox.Size.Y then
+                                    if MultiDrop.Selected[v] then MultiDrop.Selected[v] = nil else MultiDrop.Selected[v] = true end
+                                    Arcane.Settings[Name] = MultiDrop.Selected
+                                    Callback(MultiDrop.Selected)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end)
+                table.insert(Section.Elements, MultiDrop)
+            end
+
+            function Section:AddTextbox(Name, Callback)
+                local Textbox = {Value = "", Height = 35, Focused = false}
+                local Label = Create("Text", {Text = Name, Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Arcane.Config.SecondaryColor, ZIndex = 9, Visible = false})
+                local Box = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.FrameColor, Filled = true, ZIndex = 9, Visible = false})
+                local BoxOut = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.OutlineColor, Filled = false, ZIndex = 10, Visible = false})
+                local InputTxt = Create("Text", {Text = "", Size = Arcane.Config.TextSize - 1, Font = Arcane.Config.Font, Color = Color3.fromRGB(255,255,255), ZIndex = 11, Visible = false})
+
+                function Textbox.Update(Base, Visible)
+                    Label.Position = Base
+                    Box.Position = Base + Vector2.new(0, 15)
+                    BoxOut.Position = Box.Position
+                    InputTxt.Position = Box.Position + Vector2.new(5, 2)
+                    Label.Visible, Box.Visible, BoxOut.Visible, InputTxt.Visible = Visible, Visible, Visible, Visible
+                    BoxOut.Color = Textbox.Focused and Arcane.Config.AccentColor or Arcane.Config.OutlineColor
+                    InputTxt.Text = Textbox.Value .. (Textbox.Focused and "|" or "")
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Box.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Box.Position.X and M.X <= Box.Position.X + Box.Size.X and M.Y >= Box.Position.Y and M.Y <= Box.Position.Y + Box.Size.Y then
+                            Textbox.Focused = true
+                            Window.ActiveTextbox = Textbox
+                            Window.IsBinding = true
+                            game:GetService("ContextActionService"):BindActionAtPriority("DisableInput", function() return Enum.ContextActionResult.Sink end, true, 3000, Enum.UserInputType.Keyboard)
+                        else
+                            if Textbox.Focused then
+                                Textbox.Focused = false
+                                if Window.ActiveTextbox == Textbox then Window.ActiveTextbox = nil end
+                                Window.IsBinding = false
+                                game:GetService("ContextActionService"):UnbindAction("DisableInput")
+                            end
+                        end
+                    elseif Textbox.Focused and input.UserInputType == Enum.UserInputType.Keyboard then
+                        local Key = input.KeyCode
+                        if Key == Enum.KeyCode.Backspace then
+                            Textbox.Value = string.sub(Textbox.Value, 1, -2)
+                            Callback(Textbox.Value)
+                        elseif Key == Enum.KeyCode.Return then
+                            Textbox.Focused = false
+                            if Window.ActiveTextbox == Textbox then Window.ActiveTextbox = nil end
+                            Window.IsBinding = false
+                            game:GetService("ContextActionService"):UnbindAction("DisableInput")
+                            Callback(Textbox.Value)
+                        elseif Key == Enum.KeyCode.Space then
+                            Textbox.Value = Textbox.Value .. " "
+                            Callback(Textbox.Value)
+                        else
+                            local StringKey = UserInputService:GetStringForKeyCode(Key)
+                            if StringKey and #StringKey == 1 then
+                                local Shift = UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+                                Textbox.Value = Textbox.Value .. (Shift and StringKey:upper() or StringKey:lower())
+                                Callback(Textbox.Value)
+                            end
+                        end
+                    end
+                end)
+                table.insert(Section.Elements, Textbox)
+                return Textbox
+            end
+
+            function Section:AddButton(BName, Callback)
+                local Button = {Height = 25}
+                local Frame = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.FrameColor, Filled = true, ZIndex = 9, Visible = false})
+                local Out = Create("Square", {Size = Vector2.new(Section.Main.Size.X - 20, 18), Color = Arcane.Config.OutlineColor, Filled = false, ZIndex = 10, Visible = false})
+                local Label = Create("Text", {Text = BName, Size = Arcane.Config.TextSize - 2, Font = Arcane.Config.Font, Color = Color3.fromRGB(255,255,255), ZIndex = 11, Visible = false})
+
+                function Button.Update(Base, Visible)
+                    Frame.Position = Base
+                    Out.Position = Base
+                    Label.Position = Base + (Frame.Size / 2) - (Label.TextBounds / 2)
+                    Frame.Visible, Out.Visible, Label.Visible = Visible, Visible, Visible
+                end
+
+                UserInputService.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 and Frame.Visible then
+                        local M = UserInputService:GetMouseLocation()
+                        if M.X >= Frame.Position.X and M.X <= Frame.Position.X + Frame.Size.X and M.Y >= Frame.Position.Y and M.Y <= Frame.Position.Y + Frame.Size.Y then
+                            Frame.Color = Arcane.Config.AccentColor
+                            Callback()
+                            task.wait(0.1)
+                            Frame.Color = Arcane.Config.FrameColor
+                        end
+                    end
+                end)
+                table.insert(Section.Elements, Button)
+            end
+
+            table.insert(Tab.Sections, Section)
+            return Section
         end
 
-        self.ESP_Cache[player] = {
-            Drawings = drawings,
-            Skeleton = skeleton,
-            Highlight = highlight
-        }
+        if #self.Tabs == 0 then self.SelectedTab = Tab end
+        table.insert(self.Tabs, Tab)
+        return Tab
     end
 
-    Players.PlayerAdded:Connect(CreatePlayerESP)
-    Players.PlayerRemoving:Connect(RemovePlayerESP)
-    for _, p in Players:GetPlayers() do CreatePlayerESP(p) end
+    function Window:OpenSettings(MousePos)
+        Arcane:ClearMenu()
+        self.ContextMenu.Open = true
+        self.ContextMenu.Pos = MousePos
+        self.ContextMenu.Size = Vector2.new(100, 0) 
+        self.ContextMenu.Alpha = 0
+        self.ContextMenu.TargetSize = Vector2.new(100, 4 * 22)
+        local BG = Create("Square", {Position = MousePos, Size = Vector2.new(100, 0), Color = Arcane.Config.MainColor, Filled = true, Visible = true, ZIndex = 50}, true)
+        local Outline = Create("Square", {Position = MousePos, Size = Vector2.new(100, 0), Color = Arcane.Config.OutlineColor, Filled = false, Thickness = 1, Visible = true, ZIndex = 51}, true)
+        local Options = {"TopRight", "TopLeft", "BottomRight", "BottomLeft"}
+        local TextObjs = {}
+        for i, Opt in next, Options do
+            table.insert(TextObjs, {
+                Text = Create("Text", {Text = Opt, Position = MousePos, Size = 13, Font = 2, Color = Color3.fromRGB(200,200,200), Visible = false, ZIndex = 52}, true),
+                Option = Opt,
+                RelY = (i-1)*22
+            })
+        end
+        task.spawn(function()
+            while self.ContextMenu.Open do
+                RunService.RenderStepped:Wait()
+                self.ContextMenu.Size = self.ContextMenu.Size:Lerp(self.ContextMenu.TargetSize, 0.2)
+                BG.Size = self.ContextMenu.Size
+                Outline.Size = self.ContextMenu.Size
+                for _, Obj in next, TextObjs do
+                    local YPos = self.ContextMenu.Pos.Y + Obj.RelY
+                    if YPos < self.ContextMenu.Pos.Y + self.ContextMenu.Size.Y - 20 then
+                        Obj.Text.Visible = true
+                        Obj.Text.Position = self.ContextMenu.Pos + Vector2.new(5, Obj.RelY + 4)
+                        local M = UserInputService:GetMouseLocation()
+                        local Hover = M.X >= self.ContextMenu.Pos.X and M.X <= self.ContextMenu.Pos.X + 100 and M.Y >= YPos and M.Y <= YPos + 22
+                        Obj.Text.Color = Hover and Arcane.Config.AccentColor or Color3.fromRGB(200,200,200)
+                        if Hover and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                            self.TabAlignment = Obj.Option
+                            self:UpdateLayout()
+                            self.ContextMenu.Open = false
+                        end
+                    else Obj.Text.Visible = false end
+                end
+                if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    local M = UserInputService:GetMouseLocation()
+                    if not (M.X >= self.ContextMenu.Pos.X and M.X <= self.ContextMenu.Pos.X + 100 and M.Y >= self.ContextMenu.Pos.Y and M.Y <= self.ContextMenu.Pos.Y + self.ContextMenu.Size.Y) then
+                        self.ContextMenu.Open = false
+                    end
+                end
+            end
+            Arcane:ClearMenu()
+        end)
+    end
+
+    UserInputService.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseWheel and Window.Visible then
+            local Mouse = UserInputService:GetMouseLocation()
+            if Mouse.X >= Window.Elements.ContentFrame.Position.X and Mouse.X <= Window.Elements.ContentFrame.Position.X + Window.Elements.ContentFrame.Size.X and Mouse.Y >= Window.Elements.ContentFrame.Position.Y and Mouse.Y <= Window.Elements.ContentFrame.Position.Y + Window.Elements.ContentFrame.Size.Y then
+                game:GetService("ContextActionService"):BindActionAtPriority("DisableZoom", function() return Enum.ContextActionResult.Sink end, true, 3000, Enum.UserInputType.MouseWheel)
+                Window.ScrollOffset = math.max(0, Window.ScrollOffset - (input.Position.Z * 20))
+                task.delay(0.1, function() game:GetService("ContextActionService"):UnbindAction("DisableZoom") end)
+            end
+        end
+    end)
+
+    UserInputService.InputBegan:Connect(function(input)
+        if input.KeyCode == Window.ToggleKey and not Window.IsBinding then
+            Window.Visible = not Window.Visible
+            for _, Obj in next, Arcane.Registry do Obj.Visible = Window.Visible end
+        end
+        if not Window.Visible then return end
+        local Mouse = UserInputService:GetMouseLocation()
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            if Mouse.X >= Window.BasePos.X and Mouse.X <= Window.BasePos.X + Window.Size.X and Mouse.Y >= Window.BasePos.Y and Mouse.Y <= Window.BasePos.Y + 25 then
+                Window.Dragging = true; Window.DragStart = Mouse; Window.StartPos = Window.BasePos
+            end
+            for _, Tab in next, Window.Tabs do
+                local P, S = Tab.Instance.Position, Tab.Instance.TextBounds
+                if Mouse.X >= P.X and Mouse.X <= P.X + S.X and Mouse.Y >= P.Y and Mouse.Y <= P.Y + S.Y then
+                    Window.SelectedTab = Tab; Window.ScrollOffset = 0
+                end
+            end
+        elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
+            if Mouse.X >= Window.NavArea.Pos.X and Mouse.X <= Window.NavArea.Pos.X + Window.NavArea.Size.X and Mouse.Y >= Window.NavArea.Pos.Y and Mouse.Y <= Window.NavArea.Pos.Y + Window.NavArea.Size.Y then
+                Window:OpenSettings(Mouse)
+            end
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Window.Dragging = false end end)
 
     RunService.RenderStepped:Connect(function()
-        local enabled = Toggles.Esp_Enabled.Value
-        local teamCheck = Toggles.Esp_TeamCheck.Value
-        local distLimit = Toggles.Esp_DistLimitEnabled.Value
-        local maxDist = Options.Esp_MaxDist.Value
-        local camPos = Camera.CFrame.Position
-        
-        for player, cache in self.ESP_Cache do
-            local char = player.Character
-            local hum = char and char:FindFirstChildOfClass("Humanoid")
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local objects = cache.Drawings
-            local skeletonLines = cache.Skeleton
-            local highlight = cache.Highlight
-
-            local function hideAll()
-                for _, obj in objects do obj.Visible = false end
-                for _, line in skeletonLines do line.Visible = false end
-                highlight.Enabled = false
-            end
-
-            if not (enabled and char and hrp and hum and hum.Health > 0) or (teamCheck and IsSameTeam(player)) then
-                hideAll() continue
-            end
-
-            local dist = (camPos - hrp.Position).Magnitude
-            if distLimit and dist > maxDist then hideAll() continue end
-
-            local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
-            local viewportSize = Camera.ViewportSize
-            local screenCenter = viewportSize / 2
-
-            -- Off-Screen Indicator Logic
-            if Toggles.Esp_OOF.Value and not onScreen then
-                local relativePos = Camera.CFrame:PointToObjectSpace(hrp.Position)
-                local angle = _mathAtan2(relativePos.Y, relativePos.X)
-                local radius = Options.OOF_Radius.Value
-                local size = Options.OOF_Size.Value
-                local dir = _v2(_mathCos(angle), -_mathSin(angle))
-                local perp = _v2(-dir.Y, dir.X)
-                local arrowPos = screenCenter + (dir * radius)
-                local basePos = arrowPos - (dir * size)
-                
-                objects.OOF.PointA = arrowPos
-                objects.OOF.PointB = basePos + (perp * (size * 0.5))
-                objects.OOF.PointC = basePos - (perp * (size * 0.5))
-                objects.OOF.Color = Options.OOFColor.Value
-                objects.OOF.Visible = true
-            else
-                objects.OOF.Visible = false
-            end
-
-            if onScreen then
-                local head = char:FindFirstChild("Head") or hrp
-                local headPos = Camera:WorldToViewportPoint(head.Position + _v3(0, 0.5, 0))
-                local legPos = Camera:WorldToViewportPoint(hrp.Position - _v3(0, 3, 0))
-                local h = _mathAbs(headPos.Y - legPos.Y)
-                local w = h * 0.6
-                local boxPos = _v2(pos.X - w/2, pos.Y - h/2)
-
-                -- Box Logic
-                local showBox = Toggles.Esp_Box.Value
-                objects.Box.Visible = showBox
-                objects.BoxOutline.Visible = showBox
-                if showBox then
-                    objects.Box.Position = boxPos
-                    objects.Box.Size = _v2(w, h)
-                    objects.Box.Color = Options.BoxColor.Value
-                    objects.BoxOutline.Position = boxPos
-                    objects.BoxOutline.Size = _v2(w, h)
-                    
-                    local fill = Toggles.Esp_BoxFill.Value
-                    objects.BoxFilled.Visible = fill
-                    if fill then
-                        objects.BoxFilled.Position = boxPos
-                        objects.BoxFilled.Size = _v2(w, h)
-                        objects.BoxFilled.Color = Options.BoxFillColor.Value
-                        objects.BoxFilled.Transparency = Options.BoxFillColor.Transparency
-                    end
-                else
-                    objects.BoxFilled.Visible = false
-                end
-
-                -- Name & Distance
-                objects.Name.Visible = Toggles.Esp_Name.Value
-                if objects.Name.Visible then
-                    objects.Name.Position = _v2(pos.X, boxPos.Y - 15)
-                    objects.Name.Text = player.Name
-                    objects.Name.Color = Options.NameColor.Value
-                end
-
-                objects.Distance.Visible = Toggles.Esp_Distance.Value
-                if objects.Distance.Visible then
-                    objects.Distance.Position = _v2(pos.X, boxPos.Y + h + 2)
-                    objects.Distance.Text = _mathFloor(dist) .. "m"
-                    objects.Distance.Color = Options.DistanceColor.Value
-                end
-
-                -- Health Bar
-                objects.HealthBar.Visible = Toggles.Esp_HealthBar.Value
-                objects.HealthBg.Visible = objects.HealthBar.Visible
-                if objects.HealthBar.Visible then
-                    local hpPercent = _mathClamp(hum.Health / hum.MaxHealth, 0, 1)
-                    local barHeight = h * hpPercent
-                    objects.HealthBg.From = _v2(boxPos.X - 5, boxPos.Y)
-                    objects.HealthBg.To = _v2(boxPos.X - 5, boxPos.Y + h)
-                    objects.HealthBar.From = _v2(boxPos.X - 5, boxPos.Y + h)
-                    objects.HealthBar.To = _v2(boxPos.X - 5, boxPos.Y + h - barHeight)
-                    objects.HealthBar.Color = Color3.fromRGB(255, 0, 0):Lerp(Color3.fromRGB(0, 255, 0), hpPercent)
-                end
-
-                -- Tracers
-                objects.Tracer.Visible = Toggles.Esp_Tracers.Value
-                if objects.Tracer.Visible then
-                    local mode = Options.Tracer_Origin.Value
-                    local originY = (mode == "Top" and 0) or (mode == "Center" and viewportSize.Y / 2) or viewportSize.Y
-                    objects.Tracer.From = _v2(viewportSize.X / 2, originY)
-                    objects.Tracer.To = _v2(pos.X, pos.Y + h/2)
-                    objects.Tracer.Color = Options.TracerColor.Value
-                end
-
-                -- Skeleton
-                local showSkelly = Toggles.Esp_Skeleton.Value
-                if showSkelly then
-                    for i, link in skeletonLinks do
-                        local p1, p2 = char:FindFirstChild(link[1]), char:FindFirstChild(link[2])
-                        local line = skeletonLines[i]
-                        if p1 and p2 then
-                            local pos1, vis1 = Camera:WorldToViewportPoint(p1.Position)
-                            local pos2, vis2 = Camera:WorldToViewportPoint(p2.Position)
-                            if vis1 and vis2 then
-                                line.Visible = true
-                                line.From = _v2(pos1.X, pos1.Y)
-                                line.To = _v2(pos2.X, pos2.Y)
-                                line.Color = Options.SkeletonColor.Value
-                            else line.Visible = false end
-                        else line.Visible = false end
-                    end
-                else
-                    for _, line in skeletonLines do line.Visible = false end
-                end
-            else
-                for _, obj in objects do if obj ~= objects.OOF then obj.Visible = false end end
-                for _, line in skeletonLines do line.Visible = false end
-            end
-
-            -- Chams Logic
-            if Toggles.Chams_Enabled.Value then
-                if highlight.Parent ~= CoreGui then highlight.Parent = CoreGui end
-                highlight.Adornee = char
-                highlight.Enabled = true
-                highlight.FillColor = Options.ChamsFillColor.Value
-                highlight.FillTransparency = Toggles.Chams_Fill.Value and Options.ChamsFillColor.Transparency or 1
-                highlight.OutlineColor = Options.ChamsOutlineColor.Value
-                highlight.OutlineTransparency = Toggles.Chams_Outline.Value and Options.ChamsOutlineColor.Transparency or 1
-                highlight.DepthMode = Toggles.Chams_Occluded.Value and Enum.HighlightDepthMode.Occluded or Enum.HighlightDepthMode.AlwaysOnTop
-            else
-                highlight.Enabled = false
-            end
+        if not Window.Visible then return end
+        if Window.Dragging then
+            local Delta = UserInputService:GetMouseLocation() - Window.DragStart
+            Window.BasePos = Window.StartPos + Delta
+        end
+        Window:UpdateLayout()
+        local Mouse = UserInputService:GetMouseLocation()
+        for _, Tab in next, Window.Tabs do
+            local P, S = Tab.Instance.Position, Tab.Instance.TextBounds
+            local IsHovered = Mouse.X >= P.X and Mouse.X <= P.X + S.X and Mouse.Y >= P.Y and Mouse.Y <= P.Y + S.Y
+            if Window.SelectedTab == Tab then Tab.Instance.Color = Arcane.Config.SelectedColor
+            elseif IsHovered then Tab.Instance.Color = Arcane.Config.AccentColor
+            else Tab.Instance.Color = Arcane.Config.SecondaryColor end
         end
     end)
+
+    return Window
 end
 
-function UI:SetupMovement()
-    local MoveTab = self:CreateTab("Movement")
-
-    local SpeedGroup = MoveTab:AddLeftGroupbox("Speed")
-    SpeedGroup:AddToggle("Speed_Enabled", { Text = "Enabled" }):AddKeyPicker("SpeedKey", { Default = "None", Text = "Speed", Mode = "Toggle" })
-    SpeedGroup:AddDropdown("Speed_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
-    SpeedGroup:AddSlider("Speed_Value", { Text = "Speed", Default = 16, Min = 16, Max = 200, Rounding = 1 })
-
-    local FlyGroup = MoveTab:AddLeftGroupbox("Fly")
-    FlyGroup:AddToggle("Fly_Enabled", { Text = "Enabled" }):AddKeyPicker("FlyKey", { Default = "None", Text = "Fly", Mode = "Toggle" })
-    FlyGroup:AddDropdown("Fly_Mode", { Text = "Mode", Default = "Velocity", Values = {"Velocity", "CFrame"} })
-    FlyGroup:AddSlider("Fly_Speed", { Text = "Speed", Default = 50, Min = 10, Max = 200, Rounding = 1 })
-
-    local HoverGroup = MoveTab:AddRightGroupbox("Target Hovering")
-    HoverGroup:AddToggle("Hover_Enabled", { Text = "Enabled" }):AddKeyPicker("HoverKey", { Default = "None", Text = "Hover", Mode = "Toggle" })
-    HoverGroup:AddToggle("Hover_Visuals", { Text = "Ring" }):AddColorPicker("Hover_RingColor", { Default = Color3.fromRGB(255, 50, 50) })
-    HoverGroup:AddSlider("Hover_Offset", { Text = "Height Offset", Default = 15, Min = -50, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Radius", { Text = "Radius (Distance)", Default = 20, Min = 5, Max = 50, Rounding = 1 })
-    HoverGroup:AddSlider("Hover_Speed", { Text = "Rotation Speed", Default = 30, Min = 1, Max = 120, Rounding = 0, Suffix = " RPM" })
-
-    local HoverRingCache = {}
-    for i = 1, 32 do table.insert(HoverRingCache, DrawingHandler:Line({Thickness = 1, Visible = false})) end
-
-    RunService.Heartbeat:Connect(function(dt)
-        local char = LocalPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not (char and hrp and hum) then return end
-
-        if Toggles.Speed_Enabled.Value then
-            local moveDir = hum.MoveDirection
-            if moveDir.Magnitude > 0 then
-                if Options.Speed_Mode.Value == "Velocity" then
-                    hrp.Velocity = _v3(moveDir.X * Options.Speed_Value.Value, hrp.Velocity.Y, moveDir.Z * Options.Speed_Value.Value)
-                else
-                    hrp.CFrame += (moveDir * (Options.Speed_Value.Value * dt))
-                end
-            end
-        end
-
-        if Toggles.Fly_Enabled.Value then
-            local speed = Options.Fly_Speed.Value
-            local velocity = _v3(0,0,0)
-            local camCF = Camera.CFrame
-
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then velocity += camCF.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then velocity -= camCF.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then velocity -= camCF.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then velocity += camCF.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then velocity += _v3(0, 1, 0) end
-            if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then velocity -= _v3(0, 1, 0) end
-
-            if Options.Fly_Mode.Value == "Velocity" then
-                local bv = hrp:FindFirstChild("ArcaneFlyVelocity") or Instance.new("BodyVelocity")
-                bv.Name = "ArcaneFlyVelocity"; bv.MaxForce = _v3(1e9, 1e9, 1e9); bv.Velocity = velocity * speed; bv.Parent = hrp
-            else
-                local bv = hrp:FindFirstChild("ArcaneFlyVelocity")
-                if bv then bv:Destroy() end
-                hrp.Anchored = true
-                hrp.CFrame += (velocity * (speed * dt))
-            end
-        else
-            local bv = hrp:FindFirstChild("ArcaneFlyVelocity")
-            if bv then bv:Destroy() end
-            if Options.Fly_Mode.Value == "CFrame" then hrp.Anchored = false end
-        end
-
-        if Toggles.Hover_Enabled.Value then
-            local target, minDist = nil, math.huge
-            for _, p in Players:GetPlayers() do
-                if p ~= LocalPlayer and not IsSameTeam(p) then
-                    local phum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-                    local phrp = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-                    if phrp and phum and phum.Health > 0 then
-                        local d = (hrp.Position - phrp.Position).Magnitude
-                        if d < minDist then minDist = d target = phrp end
-                    end
-                end
-            end
-
-            if target then
-                local theta = os.clock() * (Options.Hover_Speed.Value / 60) * (math.pi * 2) 
-                local radius, height = Options.Hover_Radius.Value, Options.Hover_Offset.Value
-                local tPos = target.Position + _v3(_mathCos(theta) * radius, height, _mathSin(theta) * radius)
-                
-                hrp.CFrame = _cfLookAt(tPos, target.Position)
-                hrp.Velocity, hrp.RotVelocity = _v3(0,0,0), _v3(0,0,0)
-
-                if Toggles.Hover_Visuals.Value then
-                    local segs = #HoverRingCache
-                    for i = 1, segs do
-                        local a1, a2 = (i/segs) * (math.pi*2), ((i+1)/segs) * (math.pi*2)
-                        local p1 = target.Position + _v3(_mathCos(a1)*radius, height, _mathSin(a1)*radius)
-                        local p2 = target.Position + _v3(_mathCos(a2)*radius, height, _mathSin(a2)*radius)
-                        local v1, vis1 = Camera:WorldToViewportPoint(p1)
-                        local v2, vis2 = Camera:WorldToViewportPoint(p2)
-                        local line = HoverRingCache[i]
-                        if vis1 and vis2 then
-                            line.Visible = true; line.From = _v2(v1.X, v1.Y); line.To = _v2(v2.X, v2.Y); line.Color = Options.Hover_RingColor.Value
-                        else line.Visible = false end
-                    end
-                else for _, l in HoverRingCache do l.Visible = false end end
-            else for _, l in HoverRingCache do l.Visible = false end end
-        else for _, l in HoverRingCache do l.Visible = false end end
-    end)
-end
-
-function UI:SetupSettings(folder, tabName)
-    local targetTab = self:CreateTab(tabName)
-    ThemeManager:SetFolder(folder)
-    SaveManager:SetFolder(folder .. "/configs")
-    SaveManager:SetIgnoreIndexes({ 'MenuKeybind' })
-    SaveManager:BuildConfigSection(targetTab)
-    ThemeManager:ApplyToTab(targetTab)
-    
-    local menuGroup = targetTab:AddLeftGroupbox('Menu')
-    menuGroup:AddButton('Unload', function() Library:Unload() end)
-    menuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', { Default = 'RightShift', NoUI = true, Text = 'Menu keybind' })
-    Library.ToggleKeybind = Options.MenuKeybind
-    SaveManager:LoadAutoloadConfig()
-end
-
-function UI:Notify(text, time) Library:Notify(text, time or 5) end
-
-return UI
+return Arcane
