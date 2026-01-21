@@ -710,16 +710,21 @@ function Arcane:CreateWindow(Title)
     end)
 
     UserInputService.InputBegan:Connect(function(input)
-        if input.KeyCode == Window.ToggleKey and not Window.IsBinding then
-            Window.Visible = not Window.Visible
-            for _, Obj in next, Arcane.Registry do Obj.Visible = Window.Visible end
-            if not Window.Visible then 
-                ContextActionService:UnbindAction("DisableZoom")
-                ContextActionService:UnbindAction("DisableInput")
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            if input.KeyCode == Window.ToggleKey and not Window.IsBinding then
+                Window.Visible = not Window.Visible
+                for _, Obj in next, Arcane.Registry do Obj.Visible = Window.Visible end
+                if not Window.Visible then 
+                    ContextActionService:UnbindAction("DisableZoom")
+                    ContextActionService:UnbindAction("DisableInput")
+                end
             end
         end
+
         if not Window.Visible then return end
+        
         local Mouse = UserInputService:GetMouseLocation()
+        
         if input.UserInputType == Enum.UserInputType.MouseButton1 then
             if Mouse.X >= Window.BasePos.X and Mouse.X <= Window.BasePos.X + Window.Size.X and Mouse.Y >= Window.BasePos.Y and Mouse.Y <= Window.BasePos.Y + 25 then
                 Window.Dragging = true; Window.DragStart = Mouse; Window.StartPos = Window.BasePos
