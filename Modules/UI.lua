@@ -3,6 +3,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
+local ContextActionService = game:GetService("ContextActionService")
 local CoreGui = game:GetService("CoreGui")
 
 local Arcane = {
@@ -195,8 +196,6 @@ function Arcane:CreateWindow(Title)
     Window.Elements.ContentFrame = Create("Square", {Size = Window.Size - Vector2.new(20, 65), Color = self.Config.FrameColor, Filled = true, Visible = true, ZIndex = 4})
     Window.Elements.ContentOutline = Create("Square", {Size = Window.Elements.ContentFrame.Size + Vector2.new(2, 2), Color = self.Config.OutlineColor, Filled = false, Thickness = 1, Visible = true, ZIndex = 5})
     
-    local InputBlocker = Instance.new("ContextActionService")
-
     function Window:UpdateLayout()
         if not self.Visible then return end
         
@@ -578,13 +577,13 @@ function Arcane:CreateWindow(Title)
                             Textbox.Focused = true
                             Window.ActiveTextbox = Textbox
                             Window.IsBinding = true
-                            game:GetService("ContextActionService"):BindActionAtPriority("DisableInput", function() return Enum.ContextActionResult.Sink end, true, 3000, Enum.UserInputType.Keyboard)
+                            ContextActionService:BindActionAtPriority("DisableInput", function() return Enum.ContextActionResult.Sink end, true, 3000, Enum.UserInputType.Keyboard)
                         else
                             if Textbox.Focused then
                                 Textbox.Focused = false
                                 if Window.ActiveTextbox == Textbox then Window.ActiveTextbox = nil end
                                 Window.IsBinding = false
-                                game:GetService("ContextActionService"):UnbindAction("DisableInput")
+                                ContextActionService:UnbindAction("DisableInput")
                             end
                         end
                     elseif Textbox.Focused and input.UserInputType == Enum.UserInputType.Keyboard then
@@ -596,7 +595,7 @@ function Arcane:CreateWindow(Title)
                             Textbox.Focused = false
                             if Window.ActiveTextbox == Textbox then Window.ActiveTextbox = nil end
                             Window.IsBinding = false
-                            game:GetService("ContextActionService"):UnbindAction("DisableInput")
+                            ContextActionService:UnbindAction("DisableInput")
                             Callback(Textbox.Value)
                         elseif Key == Enum.KeyCode.Space then
                             Textbox.Value = Textbox.Value .. " "
@@ -705,9 +704,7 @@ function Arcane:CreateWindow(Title)
         if input.UserInputType == Enum.UserInputType.MouseWheel and Window.Visible then
             local Mouse = UserInputService:GetMouseLocation()
             if Mouse.X >= Window.Elements.ContentFrame.Position.X and Mouse.X <= Window.Elements.ContentFrame.Position.X + Window.Elements.ContentFrame.Size.X and Mouse.Y >= Window.Elements.ContentFrame.Position.Y and Mouse.Y <= Window.Elements.ContentFrame.Position.Y + Window.Elements.ContentFrame.Size.Y then
-                game:GetService("ContextActionService"):BindActionAtPriority("DisableZoom", function() return Enum.ContextActionResult.Sink end, true, 3000, Enum.UserInputType.MouseWheel)
                 Window.ScrollOffset = math.max(0, Window.ScrollOffset - (input.Position.Z * 20))
-                task.delay(0.1, function() game:GetService("ContextActionService"):UnbindAction("DisableZoom") end)
             end
         end
     end)
@@ -716,6 +713,10 @@ function Arcane:CreateWindow(Title)
         if input.KeyCode == Window.ToggleKey and not Window.IsBinding then
             Window.Visible = not Window.Visible
             for _, Obj in next, Arcane.Registry do Obj.Visible = Window.Visible end
+            if not Window.Visible then 
+                ContextActionService:UnbindAction("DisableZoom")
+                ContextActionService:UnbindAction("DisableInput")
+            end
         end
         if not Window.Visible then return end
         local Mouse = UserInputService:GetMouseLocation()
@@ -738,14 +739,37 @@ function Arcane:CreateWindow(Title)
 
     UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Window.Dragging = false end end)
 
+    local ZoomBound = false
     RunService.RenderStepped:Connect(function()
-        if not Window.Visible then return end
+        if not Window.Visible then 
+            if ZoomBound then ContextActionService:UnbindAction("DisableZoom") ZoomBound = false end
+            return 
+        end
+        
+        local Mouse = UserInputService:GetMouseLocation()
+        local InBounds = Mouse.X >= Window.Elements.ContentFrame.Position.X and 
+                         Mouse.X <= Window.Elements.ContentFrame.Position.X + Window.Elements.ContentFrame.Size.X and 
+                         Mouse.Y >= Window.Elements.ContentFrame.Position.Y and 
+                         Mouse.Y <= Window.Elements.ContentFrame.Position.Y + Window.Elements.ContentFrame.Size.Y
+
+        if InBounds then
+            if not ZoomBound then
+                ContextActionService:BindActionAtPriority("DisableZoom", function() return Enum.ContextActionResult.Sink end, false, 3000, Enum.UserInputType.MouseWheel)
+                ZoomBound = true
+            end
+        else
+            if ZoomBound then
+                ContextActionService:UnbindAction("DisableZoom")
+                ZoomBound = false
+            end
+        end
+
         if Window.Dragging then
             local Delta = UserInputService:GetMouseLocation() - Window.DragStart
             Window.BasePos = Window.StartPos + Delta
         end
         Window:UpdateLayout()
-        local Mouse = UserInputService:GetMouseLocation()
+        
         for _, Tab in next, Window.Tabs do
             local P, S = Tab.Instance.Position, Tab.Instance.TextBounds
             local IsHovered = Mouse.X >= P.X and Mouse.X <= P.X + S.X and Mouse.Y >= P.Y and Mouse.Y <= P.Y + S.Y
